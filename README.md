@@ -40,8 +40,8 @@ Future considerations:
 * Relevant Roles
 * Integrations which do not require human intervention
 
-Probably not to be considered:
+Probably will not be considered:
 * Integrations requiring human intervention
 * Big segments: Environment-specific configuration is required
 * Relay proxies: Environment-specific configuration is required
-* Experiments: Data cannot be migrated
+* Experiments: While experiment setups can be easily recreated, the data cannot be migrated from the original experiment to the new one, rendering the new experiment pointless
