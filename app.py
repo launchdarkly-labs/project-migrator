@@ -14,8 +14,6 @@ ldmigrator = LDMigrate.LDMigrate(
 )
 
 # ldmigrator = LDMigrate.LDMigrate(
-#     "api-d1217ff7-9d05-4393-be34-3a5a674ab7cb",
-#     "api-d1217ff7-9d05-4393-be34-3a5a674ab7cb",
 #     "support-service",
 #     "fun-little-project",
 # )
