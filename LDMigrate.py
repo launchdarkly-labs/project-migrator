@@ -57,6 +57,34 @@ class LDMigrate:
         self.create_target_context_kinds()
         print("Done.")
 
+        print("Creating payload filters...", end="", flush=True)
+        self.create_target_payload_filters()
+        print("Done.")
+
+        print("Creating environments...", end="", flush=True)
+        self.create_target_environments()
+        print("Done.")
+
+        print("Creating metrics...", end="", flush=True)
+        self.create_target_metrics()
+        print("Done.")
+
+        print("Creating metric groups...", end="", flush=True)
+        self.create_target_metric_groups()
+        print("Done.")
+
+        print("Creating segments...", end="", flush=True)
+        self.create_target_segments()
+        print("Done.")
+
+        print("Creating flags...", end="", flush=True)
+        self.create_target_flags()
+        print("Done.")
+
+        print("Creating flag environments/targeting...", end="", flush=True)
+        self.create_target_flag_environments()
+        print("Done.")
+
     # This function checks to see if rate limiting headers are present
     # and will delay the request if the rate limit is reached
     def http_request(self, method, url, json=None, headers=None):
@@ -937,9 +965,7 @@ class LDMigrate:
     ##################################################
 
     def create_target_metrics(self):
-        print("Getting source metrics...")
         metrics = self.get_source_metrics()
-        print("Creating metrics...")
         for metric in metrics:
             response = self.http_request(
                 "POST",
@@ -1228,6 +1254,39 @@ class LDMigrate:
                 },
             )
 
+            response = self.http_request(
+                "GET",
+                "https://app.launchdarkly.com/api/v2/projects/"
+                + self.project_key_source
+                + "/flags/"
+                + flag
+                + "/measured-rollout-configuration",
+                headers={
+                    "Authorization": self.api_key_src,
+                    "Content-Type": "application/json",
+                    "LD-API-Version": "beta",
+                },
+            )
+            m_data = json.loads(response.text)
+            if len(m_data["metrics"]) > 0:
+                metrics = []
+                for metric in m_data["metrics"]:
+                    metrics.append(metric["key"])
+                payload = {"metrics": metrics}
+                response = self.http_request(
+                    "PUT",
+                    "https://app.launchdarkly.com/api/v2/projects/"
+                    + self.project_key_target
+                    + "/flags/"
+                    + flag
+                    + "/measured-rollout-configuration",
+                    json=payload,
+                    headers={
+                        "Authorization": self.api_key_tgt,
+                        "Content-Type": "application/json",
+                        "LD-API-Version": "beta",
+                    },
+                )
             if num % 10 == 0:
                 time.sleep(5)
                 print("Reached " + str(num) + " flags. Sleeping 5 seconds.")
