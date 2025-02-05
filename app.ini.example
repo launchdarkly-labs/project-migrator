@@ -4,7 +4,8 @@ SourceProjectKey=support-service
 
 [TargetConfiguration]
 TargetApiToken=api-1234567890abcdef
-TargetProjectKey=fun-little-project # Optional
+# OPTIONAL:
+# TargetProjectKey=fun-little-project
 
 [Options]
 MigrateFlagTemplates=true

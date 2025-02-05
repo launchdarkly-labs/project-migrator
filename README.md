@@ -2,6 +2,15 @@
 
 This tool duplicates a project, typically from one account to another. This allows you to merge accounts (1 project at a time), or you can duplicate a project within the same account.
 
+Usage:
+
+1. Copy the `app.ini.example` to `app.ini`
+2. Edit `app.ini`
+3. Set the source and target API keys
+4. Set the source project key and optionally the target project key
+5. There are additional options you can set under the `[Options]` section
+6. Run `python app.py`
+
 What it migrates:
 * Project settings
 * Flag templates
