@@ -46,6 +46,3 @@ Probably will not be considered:
 * Big segments: Environment-specific configuration is required
 * Relay proxies: Environment-specific configuration is required
 * Experiments: While experiment setups can be easily recreated, the data cannot be migrated from the original experiment to the new one, rendering the new experiment pointless
-
-Reporting:
-* 
