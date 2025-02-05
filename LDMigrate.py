@@ -12,7 +12,14 @@ class LDMigrate:
     flags_to_ignore = []
     flag_keys = []
     env_keys = []
-    num_context_kinds = 0
+    total_context_kinds = 0
+    total_payload_filters = 0
+    total_environments = 0
+    total_metrics = 0
+    total_metric_groups = 0
+    total_segments = 0
+    total_flags = 0
+    total_target_rules = 0
 
     def __init__(
         self,
@@ -39,51 +46,62 @@ class LDMigrate:
 
         print("Getting all flag keys...", end="", flush=True)
         self.flag_keys = self.get_source_flag_keys()
-        print("done. Got " + str(len(self.flag_keys)) + " flag keys.")
+        print("done. Got " + str(len(self.flag_keys)) + " flag keys.", end="\n\n")
 
         print("Getting all environment keys...", end="", flush=True)
         self.env_keys = self.get_source_environment_keys()
-        print("done. Got " + str(len(self.env_keys)) + " environment keys.")
+        print("done. Got " + str(len(self.env_keys)) + " environment keys.", end="\n\n")
 
-        print("Creating target project...", end="", flush=True)
+        print("Creating target project...", flush=True)
         self.create_target_project()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Updating flag templates...", end="", flush=True)
+        print("Updating flag templates...", flush=True)
         self.create_target_flag_templates()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating context kinds...", end="", flush=True)
+        print("Creating context kinds...", flush=True)
         self.create_target_context_kinds()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating payload filters...", end="", flush=True)
+        print("Creating payload filters...", flush=True)
         self.create_target_payload_filters()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating environments...", end="", flush=True)
+        print("Creating environments...", flush=True)
         self.create_target_environments()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating metrics...", end="", flush=True)
+        print("Creating metrics...", flush=True)
         self.create_target_metrics()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating metric groups...", end="", flush=True)
+        print("Creating metric groups...", flush=True)
         self.create_target_metric_groups()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating segments...", end="", flush=True)
+        print("Creating segments...", flush=True)
         self.create_target_segments()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating flags...", end="", flush=True)
+        print("Creating flags...", flush=True)
         self.create_target_flags()
-        print("Done.")
+        print("Done.", end="\n\n")
 
-        print("Creating flag environments/targeting...", end="", flush=True)
+        print("Creating targeting rules...", flush=True)
         self.create_target_flag_environments()
-        print("Done.")
+        print("Done.", end="\n\n")
+
+        return {
+            "total_context_kinds": self.total_context_kinds,
+            "total_payload_filters": self.total_payload_filters,
+            "total_environments": self.total_environments,
+            "total_metrics": self.total_metrics,
+            "total_metric_groups": self.total_metric_groups,
+            "total_segments": self.total_segments,
+            "total_flags": self.total_flags,
+            "total_target_rules": self.total_target_rules,
+        }
 
     # This function checks to see if rate limiting headers are present
     # and will delay the request if the rate limit is reached
@@ -95,7 +113,7 @@ class LDMigrate:
                 response = requests.request(method, url, json=json, headers=headers)
                 break
             except requests.exceptions.RequestException as e:
-                print("Request failed. Retrying...")
+                print("!!! Request failed. Retrying...")
                 time.sleep(3)
             retry += 1
 
@@ -493,11 +511,9 @@ class LDMigrate:
                 else:
                     url_path = data["_links"]["next"]["href"]
             total_segments += num
-            print("Retrieved " + str(num) + " segments for " + env)
             if num > 0:
                 segments.append({"environment": env, "segments": env_segments})
             time.sleep(0.5)
-        print("Retrieved " + str(total_segments) + " total segments")
 
         return segments
 
@@ -530,7 +546,6 @@ class LDMigrate:
             else:
                 url_path = data["_links"]["next"]["href"]
                 num += pagination
-            print("Retrieved " + str(num) + " flags")
 
         return flags
 
@@ -639,7 +654,7 @@ class LDMigrate:
         )
 
         data = json.loads(response.text)
-
+        print("...created target project")
         return data
 
     ##################################################
@@ -701,6 +716,8 @@ class LDMigrate:
                     "LD-API-Version": "beta",
                 },
             )
+        print("...updated flag templates")
+        return
 
     ##################################################
     # Create target context kinds
@@ -747,13 +764,16 @@ class LDMigrate:
                 "LD-API-Version": "beta",
             },
         )
-        self.num_context_kinds = num_ctx
+        self.total_context_kinds = num_ctx
+        print("...created " + str(num_ctx) + " context kinds")
+        return
 
     ##################################################
     # Create target payload filters
     ##################################################
 
     def create_target_payload_filters(self):
+        num_filters = 0
         payload_filters = self.get_source_payload_filters()
 
         for filter in payload_filters:
@@ -780,6 +800,10 @@ class LDMigrate:
                     "LD-API-Version": "beta",
                 },
             )
+            num_filters += 1
+        self.total_payload_filters = num_filters
+        print("...created " + str(num_filters) + " payload filters")
+        return
 
     ##################################################
     # Create target environments
@@ -789,6 +813,7 @@ class LDMigrate:
         num = 0
         environments = self.get_source_environments()
         existing_keys = self.get_target_environment_keys()
+        total_envs = len(environments)
 
         for env in environments:
             num += 1
@@ -958,13 +983,16 @@ class LDMigrate:
 
             if num % 10 == 0:
                 time.sleep(5)
-                print("Reached " + str(num) + " environments. Sleeping 5 seconds.")
+                print("...reached " + str(num) + " of " + total_envs + " environments.")
+        print("...created " + str(num) + " environments")
+        self.total_environments = num
 
     ##################################################
     # Create target metrics
     ##################################################
 
     def create_target_metrics(self):
+        num_metrics = 0
         metrics = self.get_source_metrics()
         for metric in metrics:
             response = self.http_request(
@@ -978,15 +1006,18 @@ class LDMigrate:
                 },
             )
             time.sleep(0.5)
+            num_metrics += 1
+        print("...created " + str(num_metrics) + " metrics")
+        self.total_metrics = num_metrics
+        return
 
     ##################################################
     # Create target metric groups
     ##################################################
 
     def create_target_metric_groups(self):
-        print("Getting source metric groups...")
+        num_groups = 0
         metric_groups = self.get_source_metric_groups()
-        print("Creating metric groups...")
         for metric_group in metric_groups:
             metrics = []
             for metric in metric_group["metrics"]:
@@ -1017,7 +1048,11 @@ class LDMigrate:
                     "LD-API-Version": "beta",
                 },
             )
+            num_groups += 1
             time.sleep(0.5)
+        print("...created " + str(num_groups) + " metric groups")
+        self.total_metric_groups = num_groups
+        return
 
     ##################################################
     # Create target segments
@@ -1029,7 +1064,9 @@ class LDMigrate:
         for env in segments:
             add_last = []
             for segment in env["segments"]:
-                print("Creating segment: " + env["environment"] + "/" + segment["key"])
+                # print(
+                #     "...creating segment: " + env["environment"] + "/" + segment["key"]
+                # )
                 url = (
                     "https://app.launchdarkly.com/api/v2/segments/"
                     + self.project_key_source
@@ -1149,7 +1186,7 @@ class LDMigrate:
                 )
                 if response.status_code != 200:
                     print(
-                        "Error updating segment: "
+                        "...error updating segment: "
                         + env["environment"]
                         + "/"
                         + segment["key"]
@@ -1158,11 +1195,7 @@ class LDMigrate:
                 total_segments += 1
 
                 if total_segments % 10 == 0:
-                    print(
-                        "Reached "
-                        + str(total_segments)
-                        + " segments. Sleeping 2.5 seconds."
-                    )
+                    print("...reached " + str(total_segments) + " segments.")
                     time.sleep(2.5)
             for item in add_last:
                 response = self.http_request(
@@ -1177,8 +1210,8 @@ class LDMigrate:
                     },
                 )
 
-        print("Created " + str(total_segments) + " segments")
-
+        print("...created " + str(total_segments) + " segments")
+        self.total_segments = total_segments
         return
 
     ##################################################
@@ -1259,7 +1292,7 @@ class LDMigrate:
                 "https://app.launchdarkly.com/api/v2/projects/"
                 + self.project_key_source
                 + "/flags/"
-                + flag
+                + flag["key"]
                 + "/measured-rollout-configuration",
                 headers={
                     "Authorization": self.api_key_src,
@@ -1278,7 +1311,7 @@ class LDMigrate:
                     "https://app.launchdarkly.com/api/v2/projects/"
                     + self.project_key_target
                     + "/flags/"
-                    + flag
+                    + flag["key"]
                     + "/measured-rollout-configuration",
                     json=payload,
                     headers={
@@ -1289,7 +1322,10 @@ class LDMigrate:
                 )
             if num % 10 == 0:
                 time.sleep(5)
-                print("Reached " + str(num) + " flags. Sleeping 5 seconds.")
+                print("...reached " + str(num) + " flags.")
+        print("...created " + str(num) + " flags")
+        self.total_flags = num
+        return
 
     ##################################################
     # Create target flag environments
@@ -1297,7 +1333,8 @@ class LDMigrate:
 
     def create_target_flag_environments(self):
         retry = 5
-        error_flags = ["anonymous"]
+        num_flags = len(self.flag_keys)
+        error_flags = []
         while retry > 0:
             error_flags = self.create_target_flag_environments_runner(
                 retry_flags=error_flags
@@ -1307,10 +1344,12 @@ class LDMigrate:
             retry -= 1
         if len(error_flags) > 0:
             print(
-                "The environments for the following flags could not be updated:"
+                "...the environments for the following flags could not be updated:"
                 + str(error_flags)
                 + "."
             )
+        self.total_target_rules = num_flags - len(error_flags)
+        print("...created targeting rules for " + str(num_flags) + " flags")
 
     ##################################################
     # Create target flag environments runner
@@ -1421,10 +1460,12 @@ class LDMigrate:
             )
             if response.status_code != 200:
                 error_flags.append(flag)
-                print("Error updating flag " + flag + ". Will retry later.")
+                print("...error updating flag " + flag + ". Will retry later.")
                 return
             else:
-                print("Updated environments for flag " + flag + " (" + str(num) + ")")
+                print(
+                    "...updated environments for flag " + flag + " (" + str(num) + ")"
+                )
             time.sleep(3)
 
         return error_flags

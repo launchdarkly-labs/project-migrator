@@ -14,7 +14,7 @@ What it migrates:
 * Segments
 * Flags
 * Targeting Rules
-* Release pipelines
+* Metrics attached to flags
 
 What it doesn't migrate:
 * Experiments (experiment data cannot be ported at all)
@@ -36,6 +36,7 @@ Notes:
 * NOT idempotent
 
 Future considerations:
+* Release pipelines
 * Attempt to match target account members to source members and update maintainer IDs
 * Teams
 * Relevant Roles
@@ -47,3 +48,6 @@ Probably will not be considered:
 * Big segments: Environment-specific configuration is required
 * Relay proxies: Environment-specific configuration is required
 * Experiments: While experiment setups can be easily recreated, the data cannot be migrated from the original experiment to the new one, rendering the new experiment pointless
+
+Reporting:
+* 
