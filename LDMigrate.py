@@ -9,6 +9,7 @@ class LDMigrate:
     api_key_tgt = ""
     project_key_source = ""
     project_key_target = None
+    project_name_target = None
     flags_to_ignore = []
     flag_keys = []
     env_keys = []
@@ -627,10 +628,13 @@ class LDMigrate:
 
     def create_target_project(self):
         project = self.get_source_project()
+        project_name = project["name"]
+        if self.api_key_tgt == self.api_key_src:
+            project_name = project_name + " (copy)"
 
         payload = {
             "key": self.project_key_target,
-            "name": project["name"],
+            "name": project_name,
             "defaultClientSideAvailability": project["defaultClientSideAvailability"],
             "tags": project["tags"],
         }
