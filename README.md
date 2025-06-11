@@ -22,6 +22,8 @@ What it migrates:
 * Flags
 * Targeting Rules
 * Metrics attached to flags
+* Attempt to match target account members to source members and update maintainer IDs
+
 
 What it doesn't migrate:
 * Experiments (experiment data cannot be ported at all)
@@ -38,17 +40,17 @@ Notes:
 * The larger the project, the more memory and time will be required
 * Flag statuses will all be reset
 * All creation dates will be set at the time of running this script
-* Maintainer IDs are not set on any resources
-* Historical data cannot be transferred
-* NOT idempotent
+* Maintainer IDs are only set on some resources
+* Historical data (i.e. Audit log) cannot be transferred
+* Currently NOT idempotent
 
 Future considerations:
+* Merging projects
+* Some form of idempotency
 * Release pipelines
-* Attempt to match target account members to source members and update maintainer IDs
 * Teams
 * Relevant Roles
 * Integrations which do not require human intervention
-* Some form of idempotency
 
 Probably will not be considered:
 * Integrations requiring human intervention
