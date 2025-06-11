@@ -91,6 +91,8 @@ class LDConfig:
 
         if "target_project_key" in settings:
             if settings["target_project_key"] == "":
-                del settings["target_project_key"]
+                settings["target_project_key"] = settings["source_project_key"]
+        else:
+            settings["target_project_key"] = settings["source_project_key"]
 
         return settings

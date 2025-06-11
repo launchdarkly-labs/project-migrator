@@ -173,4 +173,5 @@ cython_debug/
 # project-specific
 test.sh
 test.json
+test.py
 app.ini

@@ -13,6 +13,8 @@ class LDMigrate:
     flags_to_ignore = []
     flag_keys = []
     env_keys = []
+    source_members = {}
+    target_members = {}
     total_context_kinds = 0
     total_payload_filters = 0
     total_environments = 0
@@ -41,10 +43,19 @@ class LDMigrate:
             self.flags_to_ignore = flags_to_ignore
 
     def migrate(self):
+        # print(self.api_key_src)
+        # print(self.project_key_source)
+        # print(self.api_key_tgt)
+        # print(self.project_key_target)
+        # return
+    
         if self.target_project_exists():
             print("Target project already exists.")
             return
 
+        #############################
+        # Setting up data structures
+        #############################
         print("Getting all flag keys...", end="", flush=True)
         self.flag_keys = self.get_source_flag_keys()
         print("done. Got " + str(len(self.flag_keys)) + " flag keys.", end="\n\n")
@@ -53,6 +64,17 @@ class LDMigrate:
         self.env_keys = self.get_source_environment_keys()
         print("done. Got " + str(len(self.env_keys)) + " environment keys.", end="\n\n")
 
+        print("Getting source members...", end="", flush=True)
+        self.source_members = self.get_source_members()
+        print("done.", end="\n\n")
+
+        print("Getting target members...", end="", flush=True)
+        self.target_members = self.get_target_members()
+        print("done.", end="\n\n")
+
+        ##########################
+        # Starting migration
+        ##########################
         print("Creating target project...", flush=True)
         self.create_target_project()
         print("Done.", end="\n\n")
@@ -623,6 +645,55 @@ class LDMigrate:
         return
 
     ##################################################
+    # Get source members
+    ##################################################
+
+    def get_source_members(self):
+        keep_going = True
+        source_members = {}
+        url = "/api/v2/members"
+        while keep_going:
+            response = requests.get(
+                "https://app.launchdarkly.com" + url,
+                headers={"Authorization": self.api_key_src},
+            )
+            data = json.loads(response.text)
+            for member in data["items"]:
+                source_members[member["_id"]] = member["email"]
+
+            if "next" not in data["_links"]:
+                keep_going = False
+            else:
+                url = data["_links"]["next"]["href"]
+
+        return source_members
+
+
+    ##################################################
+    # Get target members
+    ##################################################
+
+    def get_target_members(self):
+        keep_going = True
+        target_members = {}
+        url = "/api/v2/members"
+        while keep_going:
+            response = requests.get(
+                "https://app.launchdarkly.com" + url,
+                headers={"Authorization": self.api_key_tgt},
+            )
+            data = json.loads(response.text)
+            for member in data["items"]:
+                target_members[member["email"]] = member["_id"]
+
+            if "next" not in data["_links"]:
+                keep_going = False
+            else:
+                url = data["_links"]["next"]["href"]
+
+        return target_members
+
+    ##################################################
     # Create target project
     ##################################################
 
@@ -652,7 +723,7 @@ class LDMigrate:
             "https://app.launchdarkly.com/api/v2/projects",
             json=payload,
             headers={
-                "Authorization": self.api_key_src,
+                "Authorization": self.api_key_tgt,
                 "Content-Type": "application/json",
             },
         )
@@ -999,6 +1070,11 @@ class LDMigrate:
         num_metrics = 0
         metrics = self.get_source_metrics()
         for metric in metrics:
+            new_metric = metric.copy()
+            if "_maintainer" in new_metric:
+                del new_metric["_maintainer"]
+            if "_maintainer" in metric:
+                new_metric["maintainerId"] = self.target_members[metric["_maintainer"]["email"]]
             response = self.http_request(
                 "POST",
                 "https://app.launchdarkly.com/api/v2/metrics/"
@@ -1245,6 +1321,10 @@ class LDMigrate:
                 payload["customProperties"] = flag["customProperties"]
             if "_purpose" in flag:
                 payload["purpose"] = flag["_purpose"]
+            if flag["_maintainer"]["email"] in self.target_members:
+                payload["maintainerId"] = self.target_members[
+                    flag["_maintainer"]["email"]
+                ]
 
             response = self.http_request(
                 "POST",
@@ -1304,26 +1384,27 @@ class LDMigrate:
                     "LD-API-Version": "beta",
                 },
             )
-            m_data = json.loads(response.text)
-            if len(m_data["metrics"]) > 0:
-                metrics = []
-                for metric in m_data["metrics"]:
-                    metrics.append(metric["key"])
-                payload = {"metrics": metrics}
-                response = self.http_request(
-                    "PUT",
-                    "https://app.launchdarkly.com/api/v2/projects/"
-                    + self.project_key_target
-                    + "/flags/"
-                    + flag["key"]
-                    + "/measured-rollout-configuration",
-                    json=payload,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                        "LD-API-Version": "beta",
-                    },
-                )
+            if response.text != "":
+                m_data = json.loads(response.text)
+                if len(m_data["metrics"]) > 0:
+                    metrics = []
+                    for metric in m_data["metrics"]:
+                        metrics.append(metric["key"])
+                    payload = {"metrics": metrics}
+                    response = self.http_request(
+                        "PUT",
+                        "https://app.launchdarkly.com/api/v2/projects/"
+                        + self.project_key_target
+                        + "/flags/"
+                        + flag["key"]
+                        + "/measured-rollout-configuration",
+                        json=payload,
+                        headers={
+                            "Authorization": self.api_key_tgt,
+                            "Content-Type": "application/json",
+                            "LD-API-Version": "beta",
+                        },
+                    )
             if num % 10 == 0:
                 time.sleep(5)
                 print("...reached " + str(num) + " flags.")
@@ -1361,6 +1442,7 @@ class LDMigrate:
 
     def create_target_flag_environments_runner(self, retry_flags=None):
         num = 0
+        flags_list = []
         if retry_flags:
             flags_list = retry_flags
         else:
