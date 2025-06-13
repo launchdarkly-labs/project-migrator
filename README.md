@@ -11,6 +11,29 @@ This tool duplicates a project, typically from one account to another. This allo
 5. There are additional options you can set under the `[Options]` section
 6. Run `python app.py`
 
+### Example app.ini
+
+- Uncommented keys are required
+- Commented keys are optional
+
+```
+[SourceConfiguration]
+SourceApiToken=api-1234567890abcdef
+SourceProjectKey=support-service
+
+[TargetConfiguration]
+TargetApiToken=api-1234567890abcdef
+# TargetProjectKey=fun-little-project
+
+[Options]
+# MigrateFlagTemplates=true
+# MigratePayloadFilters=true
+# MigrateMetrics=true
+# FlagsToIgnore=flag1,flag2,flag3
+# MigrationMode=MigrateOnly|MigrateRetry|Merge
+
+```
+
 ## What it migrates:
 * Project settings
 * Flag templates
@@ -28,7 +51,7 @@ This tool duplicates a project, typically from one account to another. This allo
 * Restart a failed migration
 * Merge one project into another
 
-What it doesn't migrate:
+## What it doesn't migrate:
 * Experiments (experiment data cannot be ported at all)
 * Integrations (including Webhooks, Flag Triggers, and Code References)
 * Big segments
@@ -37,7 +60,7 @@ What it doesn't migrate:
 * Roles
 * Account members
 
-Notes:
+## Notes:
 * SDK / Mobile / Client keys will be new in the new project, and will need to be updated in the application's configuration
 * Try not to make changes to the source project while migrating
 * The larger the project, the more memory and time will be required
@@ -45,14 +68,14 @@ Notes:
 * All creation dates will be set at the time of running this script
 * Historical data (i.e. Audit log) cannot be transferred
 
-Future considerations:
+## Future considerations:
 * AI Configs
 * Release pipelines
 * Teams
 * Relevant Roles
 * Integrations which do not require human intervention
 
-Probably will not be considered:
+## Probably will not be considered:
 * Integrations requiring human intervention
 * Big segments: Environment-specific configuration is required
 * Relay proxies: Environment-specific configuration is required
