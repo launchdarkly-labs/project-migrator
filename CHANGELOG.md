@@ -29,3 +29,14 @@
 
 - Wrong API key used when creating project
 - Source and target members assigned to wrong list
+
+## [1.2.0] - 2025-06-13
+
+### Added
+
+- Ability to merge one project into another
+
+### Changed
+
+- Migration can be resumed
+

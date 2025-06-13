@@ -2,7 +2,13 @@ import requests
 import json
 import time
 import sys
+from enum import Enum
 
+class MigrationMode(Enum):
+    NONE = 0
+    MIGRATE = 1
+    RETRY = 2
+    MERGE = 3
 
 class LDMigrate:
     api_key_src = ""
@@ -11,6 +17,7 @@ class LDMigrate:
     project_key_target = None
     project_name_target = None
     flags_to_ignore = []
+    migration_mode = None
     flag_keys = []
     env_keys = []
     source_members = {}
@@ -31,6 +38,7 @@ class LDMigrate:
         api_key_tgt,
         project_key_target=None,
         flags_to_ignore=None,
+        migration_mode=MigrationMode.MIGRATE,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -41,18 +49,9 @@ class LDMigrate:
             self.project_key_target = project_key_target
         if flags_to_ignore is not None:
             self.flags_to_ignore = flags_to_ignore
+        self.migration_mode = migration_mode
 
     def migrate(self):
-        # print(self.api_key_src)
-        # print(self.project_key_source)
-        # print(self.api_key_tgt)
-        # print(self.project_key_target)
-        # return
-    
-        if self.target_project_exists():
-            print("Target project already exists.")
-            return
-
         #############################
         # Setting up data structures
         #############################
@@ -729,7 +728,18 @@ class LDMigrate:
         )
 
         data = json.loads(response.text)
-        print("...created target project")
+        if "code" in data:
+            if data["code"] == "conflict":
+                match self.migration_mode:
+                    case MigrationMode.MIGRATE:
+                        print("Target project already exists.")
+                        exit(1)
+                    case MigrationMode.RETRY:
+                        print("...target project exists, retrying migration")
+                    case MigrationMode.MERGE:
+                        print("...target project exists, starting merge")
+        else:
+            print("...created target project")
         return data
 
     ##################################################
@@ -1058,7 +1068,7 @@ class LDMigrate:
 
             if num % 10 == 0:
                 time.sleep(5)
-                print("...reached " + str(num) + " of " + total_envs + " environments.")
+                print("...reached " + str(num) + " of " + str(total_envs) + " environments.")
         print("...created " + str(num) + " environments")
         self.total_environments = num
 
@@ -1321,10 +1331,11 @@ class LDMigrate:
                 payload["customProperties"] = flag["customProperties"]
             if "_purpose" in flag:
                 payload["purpose"] = flag["_purpose"]
-            if flag["_maintainer"]["email"] in self.target_members:
-                payload["maintainerId"] = self.target_members[
-                    flag["_maintainer"]["email"]
-                ]
+            if "_maintainer" in flag:
+                if flag["_maintainer"]["email"] in self.target_members:
+                    payload["maintainerId"] = self.target_members[
+                        flag["_maintainer"]["email"]
+                    ]
 
             response = self.http_request(
                 "POST",

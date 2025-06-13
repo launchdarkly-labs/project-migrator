@@ -1,6 +1,7 @@
 import configparser
 import os
-
+import LDMigrate
+from LDMigrate import MigrationMode
 
 class LDConfig:
     config_file = ""
@@ -42,6 +43,9 @@ class LDConfig:
 
         source = self.config["SourceConfiguration"]
         target = self.config["TargetConfiguration"]
+        options = {}
+        if "Options" in self.sections:
+            options = self.config["Options"]
 
         if not source["SourceProjectKey"]:
             self.error_messages.append("SourceProjectKey is required")
@@ -58,6 +62,12 @@ class LDConfig:
         else:
             if target["TargetApiToken"] == "":
                 self.error_messages.append("TargetApiToken cannot be empty")
+        if "MigrationMode" in options:
+            if options["MigrationMode"].lower() == "merge":
+                if target["TargetProjectKey"] == source["SourceProjectKey"]:
+                    self.error_messages.append("Source and target project keys cannot be the same for merge mode.")
+                if target["TargetProjectKey"].strip() == "":
+                    self.error_messages.append("TargetProjectKey cannot be empty for merge mode.")
 
         if len(self.error_messages) == 0:
             self.is_valid = True
@@ -88,11 +98,25 @@ class LDConfig:
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")
-
+        else:
+            settings["flags_to_ignore"] = None
+        if "MigrationMode" in options:
+            match options["MigrationMode"].lower():
+                case "migrateonly":
+                    settings["migration_mode"] = MigrationMode.MIGRATE
+                case "migrateretry":
+                    settings["migration_mode"] = MigrationMode.RETRY
+                case "merge":
+                    settings["migration_mode"] = MigrationMode.MERGE
+                case _:
+                    settings["migration_mode"] = MigrationMode.MIGRATE
+        else:
+            settings["migration_mode"] = MigrationMode.MIGRATE
         if "target_project_key" in settings:
             if settings["target_project_key"] == "":
                 settings["target_project_key"] = settings["source_project_key"]
         else:
             settings["target_project_key"] = settings["source_project_key"]
+            
 
         return settings

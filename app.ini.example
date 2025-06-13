@@ -11,4 +11,6 @@ TargetApiToken=api-1234567890abcdef
 MigrateFlagTemplates=true
 MigratePayloadFilters=true
 MigrateMetrics=true
-FlagsToIgnore=flag1,flag2,flag3
+# FlagsToIgnore=flag1,flag2,flag3
+# MigrationMode=MigrateOnly|MigrateRetry|Merge
+

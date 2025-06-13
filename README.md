@@ -1,8 +1,8 @@
-# LaunchDarkly Project Migrator
+# LaunchDarkly Project Migrator 1.2.0
 
 This tool duplicates a project, typically from one account to another. This allows you to merge accounts (1 project at a time), or you can duplicate a project within the same account.
 
-Usage:
+## Usage:
 
 1. Copy the `app.ini.example` to `app.ini`
 2. Edit `app.ini`
@@ -11,7 +11,7 @@ Usage:
 5. There are additional options you can set under the `[Options]` section
 6. Run `python app.py`
 
-What it migrates:
+## What it migrates:
 * Project settings
 * Flag templates
 * Context kinds
@@ -24,6 +24,9 @@ What it migrates:
 * Metrics attached to flags
 * Attempt to match target account members to source members and update maintainer IDs
 
+## Additional Features
+* Restart a failed migration
+* Merge one project into another
 
 What it doesn't migrate:
 * Experiments (experiment data cannot be ported at all)
@@ -35,18 +38,15 @@ What it doesn't migrate:
 * Account members
 
 Notes:
-* SDK / Mobile / Client keys will need to be generated in the new project and updated in the application's configuration
+* SDK / Mobile / Client keys will be new in the new project, and will need to be updated in the application's configuration
 * Try not to make changes to the source project while migrating
 * The larger the project, the more memory and time will be required
 * Flag statuses will all be reset
 * All creation dates will be set at the time of running this script
-* Maintainer IDs are only set on some resources
 * Historical data (i.e. Audit log) cannot be transferred
-* Currently NOT idempotent
 
 Future considerations:
-* Merging projects
-* Some form of idempotency
+* AI Configs
 * Release pipelines
 * Teams
 * Relevant Roles
