@@ -52,6 +52,7 @@ TargetApiToken=api-1234567890abcdef
 * Merge one project into another
 
 ## What it doesn't migrate:
+* AI Configs
 * Experiments (experiment data cannot be ported at all)
 * Integrations (including Webhooks, Flag Triggers, and Code References)
 * Big segments
@@ -61,6 +62,7 @@ TargetApiToken=api-1234567890abcdef
 * Account members
 
 ## Notes:
+* When merging, source resources with the same key as the target will be overwritten by the source
 * SDK / Mobile / Client keys will be new in the new project, and will need to be updated in the application's configuration
 * Try not to make changes to the source project while migrating
 * The larger the project, the more memory and time will be required
@@ -80,3 +82,4 @@ TargetApiToken=api-1234567890abcdef
 * Big segments: Environment-specific configuration is required
 * Relay proxies: Environment-specific configuration is required
 * Experiments: While experiment setups can be easily recreated, the data cannot be migrated from the original experiment to the new one, rendering the new experiment pointless
+* Account members: these must be invites or through SSO
