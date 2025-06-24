@@ -1,6 +1,5 @@
 import configparser
 import os
-import LDMigrate
 from LDMigrate import MigrationMode
 
 class LDConfig:
@@ -12,6 +11,16 @@ class LDConfig:
     error_messages = []
     is_valid = False
     settings = {}
+    to_bool = {
+        "True": True,
+        "False": False,
+        "true": True,
+        "false": False,
+        "1": True,
+        "0": False,
+        "yes": True,
+        "no": False,
+    }
 
     def __init__(self, config_file):
         if not os.path.isfile(config_file):
@@ -86,15 +95,24 @@ class LDConfig:
             "source_project_key": source["SourceProjectKey"],
             "source_api_token": source["SourceApiToken"],
             "target_api_token": target["TargetApiToken"],
+            "migrate_flag_templates": True,
+            "migrate_context_kinds": True,
+            "migrate_payload_filters": True,
+            "migrate_segments": True,
+            "migrate_metrics": True,
         }
         if "TargetProjectKey" in target:
             settings["target_project_key"] = target["TargetProjectKey"]
         if "MigrateFlagTemplates" in options:
-            settings["migrate_flag_templates"] = bool(options["MigrateFlagTemplates"])
+            settings["migrate_flag_templates"] = self.to_bool[options["MigrateFlagTemplates"]]
+        if "MigrateContextKinds" in options:
+            settings["migrate_context_kinds"] = self.to_bool[options["MigrateContextKinds"]]
         if "MigratePayloadFilters" in options:
-            settings["migrate_payload_filters"] = bool(options["MigratePayloadFilters"])
+            settings["migrate_payload_filters"] = self.to_bool[options["MigratePayloadFilters"]]
+        if "MigrateSegments" in options:
+            settings["migrate_segments"] = self.to_bool[options["MigrateSegments"]]
         if "MigrateMetrics" in options:
-            settings["migrate_metrics"] = bool(options["MigrateMetrics"])
+            settings["migrate_metrics"] = self.to_bool[options["MigrateMetrics"]]
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")

@@ -40,3 +40,12 @@
 
 - Migration can be resumed
 
+## [1.3.0] - 2025-06-24
+
+### Added
+
+- Implemented the following optional keys in the app.ini file: MigrateFlagTemplates, MigrateContextKinds, MigratePayloadFilters, MigrateSegments, MigrateMetrics
+- REST Adapter class to make it easier handling the API
+
+
+

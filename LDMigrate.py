@@ -1,7 +1,6 @@
-import requests
 import json
 import time
-import sys
+from RestAdapter import RestAdapter
 from enum import Enum
 
 class MigrationMode(Enum):
@@ -30,6 +29,13 @@ class LDMigrate:
     total_segments = 0
     total_flags = 0
     total_target_rules = 0
+    http_source = None
+    http_target = None
+    migrate_flag_templates = True
+    migrate_payload_filters = True
+    migrate_context_kinds = True
+    migrate_segments = True
+    migrate_metrics = True
 
     def __init__(
         self,
@@ -39,6 +45,11 @@ class LDMigrate:
         project_key_target=None,
         flags_to_ignore=None,
         migration_mode=MigrationMode.MIGRATE,
+        migrate_flag_templates=True,
+        migrate_context_kinds=True,
+        migrate_payload_filters=True,
+        migrate_segments=True,
+        migrate_metrics=True,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -50,6 +61,17 @@ class LDMigrate:
         if flags_to_ignore is not None:
             self.flags_to_ignore = flags_to_ignore
         self.migration_mode = migration_mode
+        self.http_source = RestAdapter(
+            "app.launchdarkly.com", "v2", self.api_key_src
+        )
+        self.http_target = RestAdapter(
+            "app.launchdarkly.com", "v2", self.api_key_tgt
+        )
+        self.migrate_flag_templates = migrate_flag_templates
+        self.migrate_context_kinds = migrate_context_kinds
+        self.migrate_payload_filters = migrate_payload_filters
+        self.migrate_segments = migrate_segments
+        self.migrate_metrics = migrate_metrics
 
     def migrate(self):
         #############################
@@ -78,33 +100,48 @@ class LDMigrate:
         self.create_target_project()
         print("Done.", end="\n\n")
 
-        print("Updating flag templates...", flush=True)
-        self.create_target_flag_templates()
-        print("Done.", end="\n\n")
+        if self.migrate_flag_templates:
+            print("Updating flag templates...", flush=True)
+            self.create_target_flag_templates()
+            print("Done.", end="\n\n")
+        else:
+            print("Skipping flag templates migration per app.ini.", end="\n\n")
 
-        print("Creating context kinds...", flush=True)
-        self.create_target_context_kinds()
-        print("Done.", end="\n\n")
+        if self.migrate_context_kinds:
+            print("Creating context kinds...", flush=True)
+            self.create_target_context_kinds()
+            print("Done.", end="\n\n")
+        else:
+            print("Skipping context kinds migration per app.ini.", end="\n\n")
 
-        print("Creating payload filters...", flush=True)
-        self.create_target_payload_filters()
-        print("Done.", end="\n\n")
+        if self.migrate_payload_filters:
+            print("Creating payload filters...", flush=True)
+            self.create_target_payload_filters()
+            print("Done.", end="\n\n")
+        else:
+            print("Skipping payload filters migration per app.ini.", end="\n\n")
 
         print("Creating environments...", flush=True)
         self.create_target_environments()
         print("Done.", end="\n\n")
 
-        print("Creating metrics...", flush=True)
-        self.create_target_metrics()
-        print("Done.", end="\n\n")
+        if self.migrate_metrics:
+            print("Creating metrics...", flush=True)
+            self.create_target_metrics()
+            print("Done.", end="\n\n")
 
-        print("Creating metric groups...", flush=True)
-        self.create_target_metric_groups()
-        print("Done.", end="\n\n")
+            print("Creating metric groups...", flush=True)
+            self.create_target_metric_groups()
+            print("Done.", end="\n\n")
+        else:
+            print("Skipping metrics migration per app.ini.", end="\n\n")
 
-        print("Creating segments...", flush=True)
-        self.create_target_segments()
-        print("Done.", end="\n\n")
+        if self.migrate_segments:
+            print("Creating segments...", flush=True)
+            self.create_target_segments()
+            print("Done.", end="\n\n")
+        else:
+            print("Skipping segments migration per app.ini.", end="\n\n")
 
         print("Creating flags...", flush=True)
         self.create_target_flags()
@@ -127,66 +164,14 @@ class LDMigrate:
 
     # This function checks to see if rate limiting headers are present
     # and will delay the request if the rate limit is reached
-    def http_request(self, method, url, json=None, headers=None):
-
-        retry = 0
-        while retry < 5:
-            try:
-                response = requests.request(method, url, json=json, headers=headers)
-                break
-            except requests.exceptions.RequestException as e:
-                print("!!! Request failed. Retrying...")
-                time.sleep(3)
-            retry += 1
-
-        #########################
-        # Rate limiting Logic
-        #########################
-
-        if "X-Ratelimit-Route-Remaining" in response.headers:
-            call_limit = 5
-            delay = 5
-            tries = 5
-            limit_remaining = response.headers["X-Ratelimit-Route-Remaining"]
-
-            if int(limit_remaining) <= call_limit:
-                resetTime = int(response.headers["X-Ratelimit-Reset"])
-                currentMilliTime = round(time.time() * 1000)
-                if resetTime - currentMilliTime > 0:
-                    delay = round((resetTime - currentMilliTime) // 1000)
-                else:
-                    delay = 0
-
-                if delay < 1:
-                    delay = 0.5
-
-                tries -= 1
-                print(
-                    " --- Rate limit reached. Waiting for "
-                    + str(delay)
-                    + " seconds. Remaining tries: "
-                    + str(tries)
-                )
-                time.sleep(delay)
-                if tries == 0:
-                    return "Rate limit exceeded. Please try again later."
-            else:
-                tries = 5
-
-        return response
 
     ##################################################
     # Check if target project exists
     ##################################################
 
     def target_project_exists(self):
-        response = self.http_request(
-            "GET",
-            "https://app.launchdarkly.com/api/v2/projects/" + self.project_key_target,
-            headers={
-                "Authorization": self.api_key_tgt,
-                "Content-Type": "application/json",
-            },
+        response = self.http_target.get(
+            "/projects/" + self.project_key_target,
         )
         data = json.loads(response.text)
 
@@ -199,12 +184,8 @@ class LDMigrate:
     ##################################################
 
     def get_source_project(self):
-        url = "https://app.launchdarkly.com/api/v2/projects/" + self.project_key_source
-        headers = {
-            "Authorization": self.api_key_src,
-            "Content-Type": "application/json",
-        }
-        response = self.http_request("GET", url, headers=headers)
+        path = "/projects/" + self.project_key_source
+        response = self.http_source.get(path)
         data = json.loads(response.text)
         return data
 
@@ -213,17 +194,12 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_templates(self):
-        url = (
-            "https://app.launchdarkly.com/internal/projects/"
+        path = (
+            "/projects/"
             + self.project_key_source
             + "/flag-templates"
         )
-        headers = {
-            "Authorization": self.api_key_src,
-            "Content-Type": "application/json",
-            "LD-API-Version": "beta",
-        }
-        response = self.http_request("GET", url, headers=headers)
+        response = self.http_source.get(path, beta=True, internal=True)
         data = json.loads(response.text)
         return data
 
@@ -232,17 +208,12 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_defaults(self):
-        url = (
-            "https://app.launchdarkly.com/api/v2/projects/"
+        path = (
+            "/projects/"
             + self.project_key_source
             + "/flag-defaults"
         )
-        headers = {
-            "Authorization": self.api_key_src,
-            "Content-Type": "application/json",
-            "LD-API-Version": "beta",
-        }
-        response = self.http_request("GET", url, headers=headers)
+        response = self.http_source.get(path, beta=True)
         data = json.loads(response.text)
         return data
 
@@ -251,17 +222,12 @@ class LDMigrate:
     ##################################################
 
     def get_source_experiment_settings(self):
-        url = (
-            "https://app.launchdarkly.com/api/v2/projects/"
+        path = (
+            "/projects/"
             + self.project_key_source
             + "/experimentation-settings"
         )
-        headers = {
-            "Authorization": self.api_key_src,
-            "Content-Type": "application/json",
-            "LD-API-Version": "beta",
-        }
-        response = self.http_request("GET", url, headers=headers)
+        response = self.http_source.get(path, beta=True)
         data = json.loads(response.text)
         return data
 
@@ -270,16 +236,12 @@ class LDMigrate:
     ##################################################
 
     def get_source_context_kinds(self):
-        url = (
-            "https://app.launchdarkly.com/api/v2/projects/"
+        path = (
+            "/projects/"
             + self.project_key_source
             + "/context-kinds"
         )
-        headers = {
-            "Authorization": self.api_key_src,
-            "Content-Type": "application/json",
-        }
-        response = self.http_request("GET", url, headers=headers)
+        response = self.http_source.get(path)
         data = json.loads(response.text)
         return data
 
@@ -289,27 +251,22 @@ class LDMigrate:
 
     def get_source_payload_filters(self):
         payload_filters = []
-        url_path = (
-            "/api/v2/projects/" + self.project_key_source + "/payload-filters?limit=20"
-        )
+        path = "/projects/" + self.project_key_source + "/payload-filters?limit=20"
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-                "LD-API-Version": "beta",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path, beta=True)
             data = json.loads(response.text)
 
-            for item in data["items"]:
-                payload_filters.append(item)
+            # Append items to the payload_filters list
+            if "items" in data:
+                for item in data["items"]:
+                    payload_filters.append(item)
 
+            # Check if there is a next page
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return payload_filters
 
@@ -319,17 +276,10 @@ class LDMigrate:
 
     def get_source_environments(self):
         all_envs = []
-        url_path = (
-            "/api/v2/projects/" + self.project_key_source + "/environments?limit=20"
-        )
+        path = "/projects/" + self.project_key_source + "/environments?limit=20"
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
@@ -338,7 +288,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return all_envs
 
@@ -348,17 +298,10 @@ class LDMigrate:
 
     def get_source_environment_keys(self):
         env_keys = []
-        url_path = (
-            "/api/v2/projects/" + self.project_key_source + "/environments?limit=20"
-        )
+        path = "/projects/" + self.project_key_source + "/environments?limit=20"
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
@@ -367,7 +310,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return env_keys
 
@@ -377,17 +320,10 @@ class LDMigrate:
 
     def get_target_environment_keys(self):
         env_keys = []
-        url_path = (
-            "/api/v2/projects/" + self.project_key_target + "/environments?limit=20"
-        )
+        path = "/projects/" + self.project_key_target + "/environments?limit=20"
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_tgt,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_target.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
@@ -396,7 +332,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return env_keys
 
@@ -406,30 +342,18 @@ class LDMigrate:
 
     def get_source_metrics(self):
         metrics = []
-        url_path = "/api/v2/metrics/" + self.project_key_source + "?limit=20"
+        path = "/metrics/" + self.project_key_source + "?limit=20"
         keep_going = True
         total = 0
         num = 0
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
             total = data["totalCount"]
 
             for item in data["items"]:
                 num += 1
-                res = self.http_request(
-                    "GET",
-                    "https://app.launchdarkly.com/api/v2/metrics/"
-                    + self.project_key_source
-                    + "/"
-                    + item["key"],
-                    headers=headers,
-                )
+                res = self.http_source.get("/metrics/" + self.project_key_source + "/" + item["key"])
                 details = json.loads(res.text)
                 new_metric = {
                     "key": details["key"],
@@ -462,7 +386,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return metrics
 
@@ -472,19 +396,12 @@ class LDMigrate:
 
     def get_source_metric_groups(self):
         metric_groups = []
-        url_path = (
-            "/api/v2/projects/" + self.project_key_source + "/metric-groups?limit=20"
-        )
+        path = "/projects/" + self.project_key_source + "/metric-groups?limit=20"
         keep_going = True
         total = 0
         num = 0
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
             total = data["totalCount"]
 
@@ -496,7 +413,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return metric_groups
 
@@ -509,18 +426,11 @@ class LDMigrate:
         total_segments = 0
         for env in self.env_keys:
             num = 0
-            url_path = (
-                "/api/v2/segments/" + self.project_key_source + "/" + env + "?limit=20"
-            )
+            path = "/segments/" + self.project_key_source + "/" + env + "?limit=20"
             keep_going = True
             env_segments = []
             while keep_going:
-                url = "https://app.launchdarkly.com" + url_path
-                headers = {
-                    "Authorization": self.api_key_src,
-                    "Content-Type": "application/json",
-                }
-                response = self.http_request("GET", url, headers=headers)
+                response = self.http_source.get(path)
                 data = json.loads(response.text)
 
                 if data["totalCount"] > 0:
@@ -531,7 +441,7 @@ class LDMigrate:
                 if "next" not in data["_links"]:
                     keep_going = False
                 else:
-                    url_path = data["_links"]["next"]["href"]
+                    path = data["_links"]["next"]["href"].replace("/api/v2", "")
             total_segments += num
             if num > 0:
                 segments.append({"environment": env, "segments": env_segments})
@@ -547,17 +457,10 @@ class LDMigrate:
         pagination = 50
         flags = []
         num = 0
-        url_path = (
-            "/api/v2/flags/" + self.project_key_source + "?limit=" + str(pagination)
-        )
+        path = "/flags/" + self.project_key_source + "?limit=" + str(pagination)
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
@@ -566,7 +469,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
                 num += pagination
 
         return flags
@@ -579,17 +482,10 @@ class LDMigrate:
         pagination = 50
         flag_keys = []
         num = 0
-        url_path = (
-            "/api/v2/flags/" + self.project_key_source + "?limit=" + str(pagination)
-        )
+        path = "/flags/" + self.project_key_source + "?limit=" + str(pagination)
         keep_going = True
         while keep_going:
-            url = "https://app.launchdarkly.com" + url_path
-            headers = {
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            }
-            response = self.http_request("GET", url, headers=headers)
+            response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
@@ -598,7 +494,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url_path = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
                 num += pagination
 
         return flag_keys
@@ -608,17 +504,7 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_details(self, flag_key):
-        response = self.http_request(
-            "GET",
-            url="https://app.launchdarkly.com/api/v2/flags/"
-            + self.project_key_source
-            + "/"
-            + flag_key,
-            headers={
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-            },
-        )
+        response = self.http_source.get("/flags/" + self.project_key_source + "/" + flag_key)
         data = json.loads(response.text)
 
         return data
@@ -628,20 +514,10 @@ class LDMigrate:
     ##################################################
 
     def get_source_release_pipelines(self):
-        reponse = self.http_request(
-            "GET",
-            "https://app.launchdarkly.com/api/v2/projects/"
-            + self.project_key_source
-            + "/release-pipelines",
-            headers={
-                "Authorization": self.api_key_src,
-                "Content-Type": "application/json",
-                "LD-API-Version": "beta",
-            },
-        )
-        data = json.loads(reponse.text)
+        response = self.http_source.get("/projects/" + self.project_key_source + "/release-pipelines", beta=True)
+        data = json.loads(response.text)
 
-        return
+        return data
 
     ##################################################
     # Get source members
@@ -650,12 +526,9 @@ class LDMigrate:
     def get_source_members(self):
         keep_going = True
         source_members = {}
-        url = "/api/v2/members"
+        path = "/members"
         while keep_going:
-            response = requests.get(
-                "https://app.launchdarkly.com" + url,
-                headers={"Authorization": self.api_key_src},
-            )
+            response = self.http_source.get(path)
             data = json.loads(response.text)
             for member in data["items"]:
                 source_members[member["_id"]] = member["email"]
@@ -663,7 +536,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return source_members
 
@@ -675,12 +548,9 @@ class LDMigrate:
     def get_target_members(self):
         keep_going = True
         target_members = {}
-        url = "/api/v2/members"
+        path = "/members"
         while keep_going:
-            response = requests.get(
-                "https://app.launchdarkly.com" + url,
-                headers={"Authorization": self.api_key_tgt},
-            )
+            response = self.http_target.get(path)
             data = json.loads(response.text)
             for member in data["items"]:
                 target_members[member["email"]] = member["_id"]
@@ -688,7 +558,7 @@ class LDMigrate:
             if "next" not in data["_links"]:
                 keep_going = False
             else:
-                url = data["_links"]["next"]["href"]
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return target_members
 
@@ -717,15 +587,7 @@ class LDMigrate:
                 info_payload["prefix"] = project["namingConvention"]["prefix"]
             payload["namingConvention"] = info_payload
 
-        response = self.http_request(
-            "POST",
-            "https://app.launchdarkly.com/api/v2/projects",
-            json=payload,
-            headers={
-                "Authorization": self.api_key_tgt,
-                "Content-Type": "application/json",
-            },
-        )
+        response = self.http_target.post("/projects", json=payload)
 
         data = json.loads(response.text)
         if "code" in data:
@@ -788,19 +650,11 @@ class LDMigrate:
                         )
                     var_num += 1
 
-            response = self.http_request(
-                "PATCH",
-                "https://app.launchdarkly.com/internal/projects/"
-                + self.project_key_target
-                + "/flag-templates/"
-                + template["key"],
-                json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                    "LD-API-Version": "beta",
-                },
-            )
+            response = self.http_target.patch("/projects/" 
+                                              + self.project_key_target 
+                                              + "/flag-templates/" 
+                                              + template["key"], 
+                                              json=payload, beta=True, internal=True)
         print("...updated flag templates")
         return
 
@@ -821,33 +675,20 @@ class LDMigrate:
                 payload["hideInTargeting"] = kind["hideInTargeting"]
             if "archived" in kind:
                 payload["archived"] = kind["archived"]
-            response = self.http_request(
-                "PUT",
-                "https://app.launchdarkly.com/api/v2/projects/"
+            response = self.http_target.put("/projects/"
                 + self.project_key_target
                 + "/context-kinds/"
                 + kind["key"],
-                json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                },
-            )
+                json=payload)
             num_ctx += 1
 
         exp_settings = self.get_source_experiment_settings()
         payload = {"randomizationUnits": exp_settings["randomizationUnits"]}
-        response = self.http_request(
-            "PUT",
-            "https://app.launchdarkly.com/api/v2/projects/"
+        response = self.http_target.put("/projects/"
             + self.project_key_target
             + "/experimentation-settings",
             json=payload,
-            headers={
-                "Authorization": self.api_key_tgt,
-                "Content-Type": "application/json",
-                "LD-API-Version": "beta",
-            },
+            beta=True
         )
         self.total_context_kinds = num_ctx
         print("...created " + str(num_ctx) + " context kinds")
@@ -873,17 +714,12 @@ class LDMigrate:
             if "description" in filter:
                 payload["description"] = filter["description"]
 
-            response = self.http_request(
-                "POST",
-                "https://app.launchdarkly.com/api/v2/projects/"
+            response = self.http_target.post(
+                "/projects/"
                 + self.project_key_target
                 + "/payload-filters",
                 json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                    "LD-API-Version": "beta",
-                },
+                beta=True,
             )
             num_filters += 1
         self.total_payload_filters = num_filters
@@ -935,17 +771,11 @@ class LDMigrate:
                     {"op": "replace", "path": "/critical", "value": env["critical"]},
                 ]
 
-                response = self.http_request(
-                    "PATCH",
-                    "https://app.launchdarkly.com/api/v2/projects/"
+                response = self.http_target.patch("/projects/"
                     + self.project_key_target
                     + "/environments/"
                     + env["key"],
                     json=payload,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
             else:
                 payload = {
@@ -961,16 +791,11 @@ class LDMigrate:
                     "critical": env["critical"],
                 }
 
-                response = self.http_request(
-                    "POST",
-                    "https://app.launchdarkly.com/api/v2/projects/"
+                response = self.http_target.post(
+                    "/projects/"
                     + self.project_key_target
                     + "/environments",
                     json=payload,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
 
             approvals = [
@@ -1050,17 +875,12 @@ class LDMigrate:
 
             status_code = 0
             while status_code != 200:
-                response = self.http_request(
-                    "PATCH",
-                    "https://app.launchdarkly.com/api/v2/projects/"
+                response = self.http_target.patch(
+                    "/projects/"
                     + self.project_key_target
                     + "/environments/"
                     + env["key"],
                     json=approvals,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
                 if response.status_code != 200:
                     time.sleep(0.5)
@@ -1085,15 +905,10 @@ class LDMigrate:
                 del new_metric["_maintainer"]
             if "_maintainer" in metric:
                 new_metric["maintainerId"] = self.target_members[metric["_maintainer"]["email"]]
-            response = self.http_request(
-                "POST",
-                "https://app.launchdarkly.com/api/v2/metrics/"
+            response = self.http_target.post(
+                "/metrics/"
                 + self.project_key_target,
                 json=metric,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                },
             )
             time.sleep(0.5)
             num_metrics += 1
@@ -1126,17 +941,12 @@ class LDMigrate:
                 "tags": metric_group["tags"],
                 "metrics": metrics,
             }
-            response = self.http_request(
-                "POST",
-                "https://app.launchdarkly.com/api/v2/projects/"
+            response = self.http_target.post(
+                "/projects/"
                 + self.project_key_target
                 + "/metric-groups",
                 json=metric_group,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                    "LD-API-Version": "beta",
-                },
+                beta=True,
             )
             num_groups += 1
             time.sleep(0.5)
@@ -1154,24 +964,13 @@ class LDMigrate:
         for env in segments:
             add_last = []
             for segment in env["segments"]:
-                # print(
-                #     "...creating segment: " + env["environment"] + "/" + segment["key"]
-                # )
-                url = (
-                    "https://app.launchdarkly.com/api/v2/segments/"
+                response = self.http_source.get(
+                    "/segments/"
                     + self.project_key_source
                     + "/"
                     + env["environment"]
                     + "/"
                     + segment["key"]
-                )
-                response = self.http_request(
-                    "GET",
-                    url,
-                    headers={
-                        "Authorization": self.api_key_src,
-                        "Content-Type": "application/json",
-                    },
                 )
                 segment_data = json.loads(response.text)
                 payload = {
@@ -1180,17 +979,12 @@ class LDMigrate:
                     "tags": segment_data["tags"],
                     "unbounded": False,
                 }
-                response = self.http_request(
-                    "POST",
-                    "https://app.launchdarkly.com/api/v2/segments/"
+                response = self.http_target.post(
+                    "/segments/"
                     + self.project_key_target
                     + "/"
                     + env["environment"],
                     json=payload,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
                 payload = []
                 if "description" in segment_data:
@@ -1260,19 +1054,14 @@ class LDMigrate:
                             "value": rules,
                         }
                     )
-                response = self.http_request(
-                    "PATCH",
-                    "https://app.launchdarkly.com/api/v2/segments/"
+                response = self.http_target.patch(
+                    "/segments/"
                     + self.project_key_target
                     + "/"
                     + env["environment"]
                     + "/"
                     + segment["key"],
                     json=payload,
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
                 if response.status_code != 200:
                     print(
@@ -1288,16 +1077,11 @@ class LDMigrate:
                     print("...reached " + str(total_segments) + " segments.")
                     time.sleep(2.5)
             for item in add_last:
-                response = self.http_request(
-                    "PATCH",
-                    "https://app.launchdarkly.com/api/v2/segments/"
+                response = self.http_target.patch(
+                    "/segments/"
                     + self.project_key_target
                     + item["path"],
                     json=item["payload"],
-                    headers={
-                        "Authorization": self.api_key_tgt,
-                        "Content-Type": "application/json",
-                    },
                 )
 
         print("...created " + str(total_segments) + " segments")
@@ -1337,14 +1121,9 @@ class LDMigrate:
                         flag["_maintainer"]["email"]
                     ]
 
-            response = self.http_request(
-                "POST",
-                "https://app.launchdarkly.com/api/v2/flags/" + self.project_key_target,
+            response = self.http_target.post(
+                "/flags/" + self.project_key_target,
                 json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                },
             )
 
             update_payload = []
@@ -1369,31 +1148,21 @@ class LDMigrate:
                     }
                 )
 
-            response = self.http_request(
-                "PATCH",
-                "https://app.launchdarkly.com/api/v2/flags/"
+            response = self.http_target.patch(
+                "/flags/"
                 + self.project_key_target
                 + "/"
                 + flag["key"],
                 json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                },
             )
 
-            response = self.http_request(
-                "GET",
-                "https://app.launchdarkly.com/api/v2/projects/"
+            response = self.http_source.get(
+                "/projects/"
                 + self.project_key_source
                 + "/flags/"
                 + flag["key"]
                 + "/measured-rollout-configuration",
-                headers={
-                    "Authorization": self.api_key_src,
-                    "Content-Type": "application/json",
-                    "LD-API-Version": "beta",
-                },
+                beta=True
             )
             if response.text != "":
                 m_data = json.loads(response.text)
@@ -1402,19 +1171,14 @@ class LDMigrate:
                     for metric in m_data["metrics"]:
                         metrics.append(metric["key"])
                     payload = {"metrics": metrics}
-                    response = self.http_request(
-                        "PUT",
-                        "https://app.launchdarkly.com/api/v2/projects/"
+                    response = self.http_target.put(
+                        "/projects/"
                         + self.project_key_target
                         + "/flags/"
                         + flag["key"]
                         + "/measured-rollout-configuration",
                         json=payload,
-                        headers={
-                            "Authorization": self.api_key_tgt,
-                            "Content-Type": "application/json",
-                            "LD-API-Version": "beta",
-                        },
+                        beta=True,
                     )
             if num % 10 == 0:
                 time.sleep(5)
@@ -1530,12 +1294,21 @@ class LDMigrate:
                         "value": env_details["trackEventsFallthrough"],
                     }
                 )
-                rules = []
-                for rule in env_details["rules"]:
+                rules_to_del = []
+                for i, rule in enumerate(env_details["rules"]):
                     del rule["_id"]
-                    for clause in rule["clauses"]:
+                    need_to_del = []
+                    for idx, clause in enumerate(rule["clauses"]):
                         del clause["_id"]
-                    rules.append(rule)
+                        if clause["attribute"] in ["segmentMatch", "not-segmentMatch"] and not self.migrate_segments:
+                            need_to_del.append(idx)
+                    if len(need_to_del) > 0:
+                        for idx in reversed(need_to_del):
+                            del rule["clauses"][idx]
+                    if len(rule["clauses"]) == 0:
+                        rules_to_del.append(i)
+                for x in reversed(rules_to_del):
+                    del env_details["rules"][x]
                 payload.append(
                     {
                         "op": "replace",
@@ -1543,22 +1316,18 @@ class LDMigrate:
                         "value": env_details["rules"],
                     }
                 )
-            response = self.http_request(
-                "PATCH",
-                "https://app.launchdarkly.com/api/v2/flags/"
+            response = self.http_target.patch(
+                "/flags/"
                 + self.project_key_target
                 + "/"
                 + flag,
                 json=payload,
-                headers={
-                    "Authorization": self.api_key_tgt,
-                    "Content-Type": "application/json",
-                },
             )
             if response.status_code != 200:
                 error_flags.append(flag)
+                print(json.dumps(payload))
+                exit(1)
                 print("...error updating flag " + flag + ". Will retry later.")
-                return
             else:
                 print(
                     "...updated environments for flag " + flag + " (" + str(num) + ")"
