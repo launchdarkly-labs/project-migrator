@@ -47,5 +47,11 @@
 - Implemented the following optional keys in the app.ini file: MigrateFlagTemplates, MigrateContextKinds, MigratePayloadFilters, MigrateSegments, MigrateMetrics
 - REST Adapter class to make it easier handling the API
 
+## [1.4.0] - 2025-06-27
 
+### Added
 
+- Migrate between commercial and federal instances
+- Ability to migrate only specific flags
+- Ignore built-in pauses (pauses are added to help regulate rate limiting)
+- 

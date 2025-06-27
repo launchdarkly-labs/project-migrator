@@ -16,6 +16,7 @@ class LDMigrate:
     project_key_target = None
     project_name_target = None
     flags_to_ignore = []
+    flags_to_migrate = []
     migration_mode = None
     flag_keys = []
     env_keys = []
@@ -36,6 +37,7 @@ class LDMigrate:
     migrate_context_kinds = True
     migrate_segments = True
     migrate_metrics = True
+    ignore_pauses = False
 
     def __init__(
         self,
@@ -43,13 +45,17 @@ class LDMigrate:
         project_key_source,
         api_key_tgt,
         project_key_target=None,
-        flags_to_ignore=None,
+        source_is_federal=False,
+        target_is_federal=False,
+        flags_to_ignore=[],
+        flags_to_migrate=[],
         migration_mode=MigrationMode.MIGRATE,
         migrate_flag_templates=True,
         migrate_context_kinds=True,
         migrate_payload_filters=True,
         migrate_segments=True,
         migrate_metrics=True,
+        ignore_pauses=False,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -60,20 +66,30 @@ class LDMigrate:
             self.project_key_target = project_key_target
         if flags_to_ignore is not None:
             self.flags_to_ignore = flags_to_ignore
+        if flags_to_migrate is not None:
+            self.flags_to_migrate = flags_to_migrate
         self.migration_mode = migration_mode
+        src_host = "app.launchdarkly.com"
+        if source_is_federal:
+            src_host = "app.launchdarkly.us"
+        tgt_host = "app.launchdarkly.com"
+        if target_is_federal:
+            tgt_host = "app.launchdarkly.us"
         self.http_source = RestAdapter(
-            "app.launchdarkly.com", "v2", self.api_key_src
+            src_host, "v2", self.api_key_src
         )
         self.http_target = RestAdapter(
-            "app.launchdarkly.com", "v2", self.api_key_tgt
+            tgt_host, "v2", self.api_key_tgt
         )
         self.migrate_flag_templates = migrate_flag_templates
         self.migrate_context_kinds = migrate_context_kinds
         self.migrate_payload_filters = migrate_payload_filters
         self.migrate_segments = migrate_segments
         self.migrate_metrics = migrate_metrics
+        self.ignore_pauses = ignore_pauses
 
     def migrate(self):
+        self.get_source_release_pipelines()
         #############################
         # Setting up data structures
         #############################
@@ -381,7 +397,8 @@ class LDMigrate:
                 if "successCriteria" in details:
                     new_metric["successCriteria"] = details["successCriteria"]
                 metrics.append(new_metric)
-                time.sleep(0.5)
+                if not self.ignore_pauses:
+                    time.sleep(0.5)
 
             if "next" not in data["_links"]:
                 keep_going = False
@@ -408,7 +425,8 @@ class LDMigrate:
             for item in data["items"]:
                 num += 1
                 metric_groups.append(item)
-                time.sleep(0.5)
+                if not self.ignore_pauses:
+                    time.sleep(0.5)
 
             if "next" not in data["_links"]:
                 keep_going = False
@@ -422,11 +440,12 @@ class LDMigrate:
     ##################################################
 
     def get_source_segments(self):
+        limit = 20
         segments = []
         total_segments = 0
         for env in self.env_keys:
             num = 0
-            path = "/segments/" + self.project_key_source + "/" + env + "?limit=20"
+            path = "/segments/" + self.project_key_source + "/" + env + "?expand=flags&limit=" + str(limit)
             keep_going = True
             env_segments = []
             while keep_going:
@@ -438,6 +457,15 @@ class LDMigrate:
                         num += 1
                         env_segments.append(item)
 
+                # if "items" not in data:
+                #     keep_going = False
+                # else:
+                #     # Update the offset parameter to get the next page
+                #     current_offset = len(env_segments)
+                #     path = (
+                #         "/segments/" + self.project_key_source + "/" + env + 
+                #         "?limit=" + str(limit) + "&offset=" + str(current_offset)
+                #     )
                 if "next" not in data["_links"]:
                     keep_going = False
                 else:
@@ -445,7 +473,8 @@ class LDMigrate:
             total_segments += num
             if num > 0:
                 segments.append({"environment": env, "segments": env_segments})
-            time.sleep(0.5)
+            if not self.ignore_pauses:
+                time.sleep(0.5)
 
         return segments
 
@@ -458,12 +487,18 @@ class LDMigrate:
         flags = []
         num = 0
         path = "/flags/" + self.project_key_source + "?limit=" + str(pagination)
+        ignore_flags = True if len(self.flags_to_ignore) > 0 else False
+        migrate_flags = True if len(self.flags_to_migrate) > 0 else False
         keep_going = True
         while keep_going:
             response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
+                if ignore_flags and item["key"] in self.flags_to_ignore:
+                    continue
+                if migrate_flags and item["key"] not in self.flags_to_migrate:
+                    continue
                 flags.append(item)
 
             if "next" not in data["_links"]:
@@ -483,12 +518,18 @@ class LDMigrate:
         flag_keys = []
         num = 0
         path = "/flags/" + self.project_key_source + "?limit=" + str(pagination)
+        ignore_flags = True if len(self.flags_to_ignore) > 0 else False
+        migrate_flags = True if len(self.flags_to_migrate) > 0 else False
         keep_going = True
         while keep_going:
             response = self.http_source.get(path)
             data = json.loads(response.text)
 
             for item in data["items"]:
+                if ignore_flags and item["key"] in self.flags_to_ignore:
+                    continue
+                if migrate_flags and item["key"] not in self.flags_to_migrate:
+                    continue
                 flag_keys.append(item["key"])
 
             if "next" not in data["_links"]:
@@ -516,6 +557,8 @@ class LDMigrate:
     def get_source_release_pipelines(self):
         response = self.http_source.get("/projects/" + self.project_key_source + "/release-pipelines", beta=True)
         data = json.loads(response.text)
+        print(json.dumps(data))
+        exit(1)
 
         return data
 
@@ -883,11 +926,13 @@ class LDMigrate:
                     json=approvals,
                 )
                 if response.status_code != 200:
-                    time.sleep(0.5)
+                    if not self.ignore_pauses:
+                        time.sleep(0.5)
                 status_code = response.status_code
 
             if num % 10 == 0:
-                time.sleep(5)
+                if not self.ignore_pauses:
+                    time.sleep(5)
                 print("...reached " + str(num) + " of " + str(total_envs) + " environments.")
         print("...created " + str(num) + " environments")
         self.total_environments = num
@@ -910,7 +955,8 @@ class LDMigrate:
                 + self.project_key_target,
                 json=metric,
             )
-            time.sleep(0.5)
+            if not self.ignore_pauses:
+                time.sleep(0.5)
             num_metrics += 1
         print("...created " + str(num_metrics) + " metrics")
         self.total_metrics = num_metrics
@@ -949,7 +995,8 @@ class LDMigrate:
                 beta=True,
             )
             num_groups += 1
-            time.sleep(0.5)
+            if not self.ignore_pauses:
+                time.sleep(0.5)
         print("...created " + str(num_groups) + " metric groups")
         self.total_metric_groups = num_groups
         return
@@ -1075,7 +1122,8 @@ class LDMigrate:
 
                 if total_segments % 10 == 0:
                     print("...reached " + str(total_segments) + " segments.")
-                    time.sleep(2.5)
+                    if not self.ignore_pauses:
+                        time.sleep(2.5)
             for item in add_last:
                 response = self.http_target.patch(
                     "/segments/"
@@ -1181,7 +1229,8 @@ class LDMigrate:
                         beta=True,
                     )
             if num % 10 == 0:
-                time.sleep(5)
+                if not self.ignore_pauses:
+                    time.sleep(5)
                 print("...reached " + str(num) + " flags.")
         print("...created " + str(num) + " flags")
         self.total_flags = num
@@ -1332,6 +1381,7 @@ class LDMigrate:
                 print(
                     "...updated environments for flag " + flag + " (" + str(num) + ")"
                 )
-            time.sleep(3)
+            if not self.ignore_pauses:
+                time.sleep(3)
 
         return error_flags

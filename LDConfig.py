@@ -34,7 +34,13 @@ class LDConfig:
     def get_config(self):
         self.read_config()
         self.validate_config()
-        return self.get_settings()
+        settings = self.get_settings()
+        if not self.is_valid:
+            print("Configuration is not valid:")
+            for error in self.error_messages:
+                print("  - " + error)
+            exit(1)
+        return settings
 
     def read_config(self):
         self.config.read(self.config_file)
@@ -61,16 +67,19 @@ class LDConfig:
         else:
             if source["SourceProjectKey"] == "":
                 self.error_messages.append("SourceProjectKey cannot be empty")
+        
         if not source["SourceApiToken"]:
             self.error_messages.append("SourceApiToken is required")
         else:
             if source["SourceApiToken"] == "":
                 self.error_messages.append("SourceApiToken cannot be empty")
+
         if not target["TargetApiToken"]:
             self.error_messages.append("TargetApiToken is required")
         else:
             if target["TargetApiToken"] == "":
                 self.error_messages.append("TargetApiToken cannot be empty")
+
         if "MigrationMode" in options:
             if options["MigrationMode"].lower() == "merge":
                 if target["TargetProjectKey"] == source["SourceProjectKey"]:
@@ -94,7 +103,10 @@ class LDConfig:
         settings = {
             "source_project_key": source["SourceProjectKey"],
             "source_api_token": source["SourceApiToken"],
+            "source_is_federal": False,
             "target_api_token": target["TargetApiToken"],
+            "target_is_federal": False,
+            "ignore_pauses": False,
             "migrate_flag_templates": True,
             "migrate_context_kinds": True,
             "migrate_payload_filters": True,
@@ -113,11 +125,22 @@ class LDConfig:
             settings["migrate_segments"] = self.to_bool[options["MigrateSegments"]]
         if "MigrateMetrics" in options:
             settings["migrate_metrics"] = self.to_bool[options["MigrateMetrics"]]
+        if "SourceIsFederal" in source:
+            settings["source_is_federal"] = self.to_bool[source["SourceIsFederal"]]
+        if "TargetIsFederal" in target:
+            settings["target_is_federal"] = self.to_bool[target["TargetIsFederal"]]
+        if "IgnorePauses" in options:
+            settings["ignore_pauses"] = self.to_bool[options["IgnorePauses"]]
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")
         else:
-            settings["flags_to_ignore"] = None
+            settings["flags_to_ignore"] = []
+        if "FlagsToMigrate" in options:
+            if options["FlagsToMigrate"] != "":
+                settings["flags_to_migrate"] = options["FlagsToMigrate"].split(",")
+        else:
+            settings["flags_to_migrate"] = []
         if "MigrationMode" in options:
             match options["MigrationMode"].lower():
                 case "migrateonly":
@@ -135,6 +158,11 @@ class LDConfig:
                 settings["target_project_key"] = settings["source_project_key"]
         else:
             settings["target_project_key"] = settings["source_project_key"]
+
+        if len(settings["flags_to_ignore"]) > 0 and len(settings["flags_to_migrate"]) > 0:
+            self.error_messages.append("Cannot specify both FlagsToIgnore and FlagsToMigrate.")
+            self.is_valid = False
+            return
             
 
         return settings

@@ -1,11 +1,12 @@
 [SourceConfiguration]
 SourceApiToken=api-1234567890abcdef
 SourceProjectKey=support-service
+# SourceIsFederal=false
 
 [TargetConfiguration]
 TargetApiToken=api-1234567890abcdef
-# OPTIONAL:
 # TargetProjectKey=fun-little-project
+# TargetIsFederal=false
 
 [Options]
 MigrateFlagTemplates=true
@@ -13,6 +14,8 @@ MigrateContextKinds=true
 MigratePayloadFilters=true
 MigrateSegments=true
 MigrateMetrics=true
+# IgnorePauses=false
 # FlagsToIgnore=flag1,flag2,flag3
+# FlagsToMigrate=flag1,flag2,flag3
 # MigrationMode=MigrateOnly|MigrateRetry|Merge
 

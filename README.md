@@ -1,4 +1,4 @@
-# LaunchDarkly Project Migrator 1.2.0
+# LaunchDarkly Project Migrator 1.4.0
 
 This tool duplicates a project, typically from one account to another. This allows you to merge accounts (1 project at a time), or you can duplicate a project within the same account.
 
@@ -20,18 +20,23 @@ This tool duplicates a project, typically from one account to another. This allo
 [SourceConfiguration]
 SourceApiToken=api-1234567890abcdef
 SourceProjectKey=support-service
+# SourceIsFederal=false
 
 [TargetConfiguration]
 TargetApiToken=api-1234567890abcdef
 # TargetProjectKey=fun-little-project
+# TargetIsFederal=false
 
 [Options]
-# MigrateFlagTemplates=true
-# MigratePayloadFilters=true
-# MigrateMetrics=true
+MigrateFlagTemplates=true
+MigrateContextKinds=true
+MigratePayloadFilters=true
+MigrateSegments=true
+MigrateMetrics=true
+# IgnorePauses=false
 # FlagsToIgnore=flag1,flag2,flag3
+# FlagsToMigrate=flag1,flag2,flag3
 # MigrationMode=MigrateOnly|MigrateRetry|Merge
-
 ```
 
 ## What it migrates:
@@ -50,6 +55,9 @@ TargetApiToken=api-1234567890abcdef
 ## Additional Features
 * Restart a failed migration
 * Merge one project into another
+* Duplicate a project in the same instance
+* Select specific flags to copy
+* Select specific flags to ignore
 
 ## What it doesn't migrate:
 * AI Configs
