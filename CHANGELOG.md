@@ -55,3 +55,9 @@
 - Ability to migrate only specific flags
 - Ignore built-in pauses (pauses are added to help regulate rate limiting)
 - 
+
+## [1.4.1] - 2025-07-25
+
+### Fixed
+
+- Removed attaching metrics to flags as the fucntionality was removed from the LaunchDarkly Platform
