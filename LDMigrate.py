@@ -3,11 +3,13 @@ import time
 from RestAdapter import RestAdapter
 from enum import Enum
 
+
 class MigrationMode(Enum):
     NONE = 0
     MIGRATE = 1
     RETRY = 2
     MERGE = 3
+
 
 class LDMigrate:
     api_key_src = ""
@@ -75,12 +77,8 @@ class LDMigrate:
         tgt_host = "app.launchdarkly.com"
         if target_is_federal:
             tgt_host = "app.launchdarkly.us"
-        self.http_source = RestAdapter(
-            src_host, "v2", self.api_key_src
-        )
-        self.http_target = RestAdapter(
-            tgt_host, "v2", self.api_key_tgt
-        )
+        self.http_source = RestAdapter(src_host, "v2", self.api_key_src)
+        self.http_target = RestAdapter(tgt_host, "v2", self.api_key_tgt)
         self.migrate_flag_templates = migrate_flag_templates
         self.migrate_context_kinds = migrate_context_kinds
         self.migrate_payload_filters = migrate_payload_filters
@@ -210,11 +208,7 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_templates(self):
-        path = (
-            "/projects/"
-            + self.project_key_source
-            + "/flag-templates"
-        )
+        path = "/projects/" + self.project_key_source + "/flag-templates"
         response = self.http_source.get(path, beta=True, internal=True)
         data = json.loads(response.text)
         return data
@@ -224,11 +218,7 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_defaults(self):
-        path = (
-            "/projects/"
-            + self.project_key_source
-            + "/flag-defaults"
-        )
+        path = "/projects/" + self.project_key_source + "/flag-defaults"
         response = self.http_source.get(path, beta=True)
         data = json.loads(response.text)
         return data
@@ -238,11 +228,7 @@ class LDMigrate:
     ##################################################
 
     def get_source_experiment_settings(self):
-        path = (
-            "/projects/"
-            + self.project_key_source
-            + "/experimentation-settings"
-        )
+        path = "/projects/" + self.project_key_source + "/experimentation-settings"
         response = self.http_source.get(path, beta=True)
         data = json.loads(response.text)
         return data
@@ -252,11 +238,7 @@ class LDMigrate:
     ##################################################
 
     def get_source_context_kinds(self):
-        path = (
-            "/projects/"
-            + self.project_key_source
-            + "/context-kinds"
-        )
+        path = "/projects/" + self.project_key_source + "/context-kinds"
         response = self.http_source.get(path)
         data = json.loads(response.text)
         return data
@@ -369,7 +351,9 @@ class LDMigrate:
 
             for item in data["items"]:
                 num += 1
-                res = self.http_source.get("/metrics/" + self.project_key_source + "/" + item["key"])
+                res = self.http_source.get(
+                    "/metrics/" + self.project_key_source + "/" + item["key"]
+                )
                 details = json.loads(res.text)
                 new_metric = {
                     "key": details["key"],
@@ -445,7 +429,14 @@ class LDMigrate:
         total_segments = 0
         for env in self.env_keys:
             num = 0
-            path = "/segments/" + self.project_key_source + "/" + env + "?expand=flags&limit=" + str(limit)
+            path = (
+                "/segments/"
+                + self.project_key_source
+                + "/"
+                + env
+                + "?expand=flags&limit="
+                + str(limit)
+            )
             keep_going = True
             env_segments = []
             while keep_going:
@@ -463,7 +454,7 @@ class LDMigrate:
                 #     # Update the offset parameter to get the next page
                 #     current_offset = len(env_segments)
                 #     path = (
-                #         "/segments/" + self.project_key_source + "/" + env + 
+                #         "/segments/" + self.project_key_source + "/" + env +
                 #         "?limit=" + str(limit) + "&offset=" + str(current_offset)
                 #     )
                 if "next" not in data["_links"]:
@@ -545,7 +536,9 @@ class LDMigrate:
     ##################################################
 
     def get_source_flag_details(self, flag_key):
-        response = self.http_source.get("/flags/" + self.project_key_source + "/" + flag_key)
+        response = self.http_source.get(
+            "/flags/" + self.project_key_source + "/" + flag_key
+        )
         data = json.loads(response.text)
 
         return data
@@ -555,7 +548,9 @@ class LDMigrate:
     ##################################################
 
     def get_source_release_pipelines(self):
-        response = self.http_source.get("/projects/" + self.project_key_source + "/release-pipelines", beta=True)
+        response = self.http_source.get(
+            "/projects/" + self.project_key_source + "/release-pipelines", beta=True
+        )
         data = json.loads(response.text)
         print(json.dumps(data))
         exit(1)
@@ -582,7 +577,6 @@ class LDMigrate:
                 path = data["_links"]["next"]["href"].replace("/api/v2", "")
 
         return source_members
-
 
     ##################################################
     # Get target members
@@ -693,11 +687,15 @@ class LDMigrate:
                         )
                     var_num += 1
 
-            response = self.http_target.patch("/projects/" 
-                                              + self.project_key_target 
-                                              + "/flag-templates/" 
-                                              + template["key"], 
-                                              json=payload, beta=True, internal=True)
+            response = self.http_target.patch(
+                "/projects/"
+                + self.project_key_target
+                + "/flag-templates/"
+                + template["key"],
+                json=payload,
+                beta=True,
+                internal=True,
+            )
         print("...updated flag templates")
         return
 
@@ -718,20 +716,21 @@ class LDMigrate:
                 payload["hideInTargeting"] = kind["hideInTargeting"]
             if "archived" in kind:
                 payload["archived"] = kind["archived"]
-            response = self.http_target.put("/projects/"
+            response = self.http_target.put(
+                "/projects/"
                 + self.project_key_target
                 + "/context-kinds/"
                 + kind["key"],
-                json=payload)
+                json=payload,
+            )
             num_ctx += 1
 
         exp_settings = self.get_source_experiment_settings()
         payload = {"randomizationUnits": exp_settings["randomizationUnits"]}
-        response = self.http_target.put("/projects/"
-            + self.project_key_target
-            + "/experimentation-settings",
+        response = self.http_target.put(
+            "/projects/" + self.project_key_target + "/experimentation-settings",
             json=payload,
-            beta=True
+            beta=True,
         )
         self.total_context_kinds = num_ctx
         print("...created " + str(num_ctx) + " context kinds")
@@ -758,9 +757,7 @@ class LDMigrate:
                 payload["description"] = filter["description"]
 
             response = self.http_target.post(
-                "/projects/"
-                + self.project_key_target
-                + "/payload-filters",
+                "/projects/" + self.project_key_target + "/payload-filters",
                 json=payload,
                 beta=True,
             )
@@ -814,7 +811,8 @@ class LDMigrate:
                     {"op": "replace", "path": "/critical", "value": env["critical"]},
                 ]
 
-                response = self.http_target.patch("/projects/"
+                response = self.http_target.patch(
+                    "/projects/"
                     + self.project_key_target
                     + "/environments/"
                     + env["key"],
@@ -835,9 +833,7 @@ class LDMigrate:
                 }
 
                 response = self.http_target.post(
-                    "/projects/"
-                    + self.project_key_target
-                    + "/environments",
+                    "/projects/" + self.project_key_target + "/environments",
                     json=payload,
                 )
 
@@ -933,7 +929,13 @@ class LDMigrate:
             if num % 10 == 0:
                 if not self.ignore_pauses:
                     time.sleep(5)
-                print("...reached " + str(num) + " of " + str(total_envs) + " environments.")
+                print(
+                    "...reached "
+                    + str(num)
+                    + " of "
+                    + str(total_envs)
+                    + " environments."
+                )
         print("...created " + str(num) + " environments")
         self.total_environments = num
 
@@ -949,10 +951,11 @@ class LDMigrate:
             if "_maintainer" in new_metric:
                 del new_metric["_maintainer"]
             if "_maintainer" in metric:
-                new_metric["maintainerId"] = self.target_members[metric["_maintainer"]["email"]]
+                new_metric["maintainerId"] = self.target_members[
+                    metric["_maintainer"]["email"]
+                ]
             response = self.http_target.post(
-                "/metrics/"
-                + self.project_key_target,
+                "/metrics/" + self.project_key_target,
                 json=metric,
             )
             if not self.ignore_pauses:
@@ -988,9 +991,7 @@ class LDMigrate:
                 "metrics": metrics,
             }
             response = self.http_target.post(
-                "/projects/"
-                + self.project_key_target
-                + "/metric-groups",
+                "/projects/" + self.project_key_target + "/metric-groups",
                 json=metric_group,
                 beta=True,
             )
@@ -1027,10 +1028,7 @@ class LDMigrate:
                     "unbounded": False,
                 }
                 response = self.http_target.post(
-                    "/segments/"
-                    + self.project_key_target
-                    + "/"
-                    + env["environment"],
+                    "/segments/" + self.project_key_target + "/" + env["environment"],
                     json=payload,
                 )
                 payload = []
@@ -1126,9 +1124,7 @@ class LDMigrate:
                         time.sleep(2.5)
             for item in add_last:
                 response = self.http_target.patch(
-                    "/segments/"
-                    + self.project_key_target
-                    + item["path"],
+                    "/segments/" + self.project_key_target + item["path"],
                     json=item["payload"],
                 )
 
@@ -1197,37 +1193,34 @@ class LDMigrate:
                 )
 
             response = self.http_target.patch(
-                "/flags/"
-                + self.project_key_target
-                + "/"
-                + flag["key"],
+                "/flags/" + self.project_key_target + "/" + flag["key"],
                 json=payload,
             )
 
-            response = self.http_source.get(
-                "/projects/"
-                + self.project_key_source
-                + "/flags/"
-                + flag["key"]
-                + "/measured-rollout-configuration",
-                beta=True
-            )
-            if response.text != "":
-                m_data = json.loads(response.text)
-                if len(m_data["metrics"]) > 0:
-                    metrics = []
-                    for metric in m_data["metrics"]:
-                        metrics.append(metric["key"])
-                    payload = {"metrics": metrics}
-                    response = self.http_target.put(
-                        "/projects/"
-                        + self.project_key_target
-                        + "/flags/"
-                        + flag["key"]
-                        + "/measured-rollout-configuration",
-                        json=payload,
-                        beta=True,
-                    )
+            # response = self.http_source.get(
+            #     "/projects/"
+            #     + self.project_key_source
+            #     + "/flags/"
+            #     + flag["key"]
+            #     + "/measured-rollout-configuration",
+            #     beta=True
+            # )
+            # if response.text != "":
+            #     m_data = json.loads(response.text)
+            #     if len(m_data["metrics"]) > 0:
+            #         metrics = []
+            #         for metric in m_data["metrics"]:
+            #             metrics.append(metric["key"])
+            #         payload = {"metrics": metrics}
+            #         response = self.http_target.put(
+            #             "/projects/"
+            #             + self.project_key_target
+            #             + "/flags/"
+            #             + flag["key"]
+            #             + "/measured-rollout-configuration",
+            #             json=payload,
+            #             beta=True,
+            #         )
             if num % 10 == 0:
                 if not self.ignore_pauses:
                     time.sleep(5)
@@ -1349,7 +1342,10 @@ class LDMigrate:
                     need_to_del = []
                     for idx, clause in enumerate(rule["clauses"]):
                         del clause["_id"]
-                        if clause["attribute"] in ["segmentMatch", "not-segmentMatch"] and not self.migrate_segments:
+                        if (
+                            clause["attribute"] in ["segmentMatch", "not-segmentMatch"]
+                            and not self.migrate_segments
+                        ):
                             need_to_del.append(idx)
                     if len(need_to_del) > 0:
                         for idx in reversed(need_to_del):
@@ -1366,10 +1362,7 @@ class LDMigrate:
                     }
                 )
             response = self.http_target.patch(
-                "/flags/"
-                + self.project_key_target
-                + "/"
-                + flag,
+                "/flags/" + self.project_key_target + "/" + flag,
                 json=payload,
             )
             if response.status_code != 200:
