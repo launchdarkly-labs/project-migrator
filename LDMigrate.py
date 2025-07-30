@@ -87,7 +87,7 @@ class LDMigrate:
         self.ignore_pauses = ignore_pauses
 
     def migrate(self):
-        self.get_source_release_pipelines()
+        # self.get_source_release_pipelines()
         #############################
         # Setting up data structures
         #############################

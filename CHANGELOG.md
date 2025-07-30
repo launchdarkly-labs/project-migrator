@@ -61,3 +61,9 @@
 ### Fixed
 
 - Removed attaching metrics to flags as the fucntionality was removed from the LaunchDarkly Platform
+
+## [1.4.2] - 2025-07-30
+
+### Fixed
+
+- Removed reference to getting release pipelines due to incomplete code.
