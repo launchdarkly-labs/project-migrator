@@ -67,7 +67,7 @@ class LDConfig:
         else:
             if source["SourceProjectKey"] == "":
                 self.error_messages.append("SourceProjectKey cannot be empty")
-        
+
         if not source["SourceApiToken"]:
             self.error_messages.append("SourceApiToken is required")
         else:
@@ -115,6 +115,8 @@ class LDConfig:
         }
         if "TargetProjectKey" in target:
             settings["target_project_key"] = target["TargetProjectKey"]
+        if "TargetView" in target:
+            settings["target_view"] = target["TargetView"]
         if "MigrateFlagTemplates" in options:
             settings["migrate_flag_templates"] = self.to_bool[options["MigrateFlagTemplates"]]
         if "MigrateContextKinds" in options:
@@ -163,6 +165,5 @@ class LDConfig:
             self.error_messages.append("Cannot specify both FlagsToIgnore and FlagsToMigrate.")
             self.is_valid = False
             return
-            
 
         return settings
