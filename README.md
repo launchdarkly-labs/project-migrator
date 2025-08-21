@@ -1,4 +1,4 @@
-# LaunchDarkly Project Migrator 1.4.3
+# LaunchDarkly Project Migrator 1.4.4
 
 This tool duplicates a project, typically from one account to another. This allows you to merge accounts (1 project at a time), or you can duplicate a project within the same account.
 

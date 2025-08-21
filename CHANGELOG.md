@@ -74,3 +74,9 @@
 
 - Exit the app is HTTP requests cannot go through.
 
+## [1.4.4] - 2025-08-21
+
+### Added
+
+- Check to see if `links` item exists in the payload filters payload.
+

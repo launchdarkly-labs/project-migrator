@@ -256,15 +256,18 @@ class LDMigrate:
             data = json.loads(response.text)
 
             # Append items to the payload_filters list
-            if "items" in data:
+            if "iems" in data:
                 for item in data["items"]:
                     payload_filters.append(item)
 
             # Check if there is a next page
-            if "next" not in data["_links"]:
-                keep_going = False
+            if "_links" in data:
+                if "next" not in data["_links"]:
+                    keep_going = False
+                else:
+                    path = data["_links"]["next"]["href"].replace("/api/v2", "")
             else:
-                path = data["_links"]["next"]["href"].replace("/api/v2", "")
+                keep_going = False
 
         return payload_filters
 
