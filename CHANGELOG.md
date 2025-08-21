@@ -67,3 +67,10 @@
 ### Fixed
 
 - Removed reference to getting release pipelines due to incomplete code.
+
+## [1.4.3] - 2025-08-21
+
+### Added
+
+- Exit the app is HTTP requests cannot go through.
+

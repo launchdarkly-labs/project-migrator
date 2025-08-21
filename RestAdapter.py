@@ -2,6 +2,7 @@ import requests
 import json
 import time
 
+
 class RestAdapter:
     url = ""
     url_int = ""
@@ -13,25 +14,37 @@ class RestAdapter:
         self.api_token = api_token
         self.headers = {
             "Authorization": f"{self.api_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-    
+
     def get(self, path, params=None, json=None, beta=False, internal=False):
-        return self.request("GET", path, params=params, json=json, beta=beta, internal=internal)
+        return self.request(
+            "GET", path, params=params, json=json, beta=beta, internal=internal
+        )
 
     def post(self, path, params=None, json=None, beta=False, internal=False):
-        return self.request("POST", path, params=params, json=json, beta=beta, internal=internal)
+        return self.request(
+            "POST", path, params=params, json=json, beta=beta, internal=internal
+        )
 
     def put(self, path, params=None, json=None, beta=False, internal=False):
-        return self.request("PUT", path, params=params, json=json, beta=beta, internal=internal)
+        return self.request(
+            "PUT", path, params=params, json=json, beta=beta, internal=internal
+        )
 
     def delete(self, path, params=None, json=None, beta=False, internal=False):
-        return self.request("DELETE", path, params=params, json=json, beta=beta, internal=internal)
+        return self.request(
+            "DELETE", path, params=params, json=json, beta=beta, internal=internal
+        )
 
     def patch(self, path, params=None, json=None, beta=False, internal=False):
-        return self.request("PATCH", path, params=params, json=json, beta=beta, internal=internal)
+        return self.request(
+            "PATCH", path, params=params, json=json, beta=beta, internal=internal
+        )
 
-    def request(self, http_method, path, params=None, json=None, beta=False, internal=False):
+    def request(
+        self, http_method, path, params=None, json=None, beta=False, internal=False
+    ):
         new_path = path
         if not new_path.startswith("/"):
             new_path = "/" + new_path
@@ -42,8 +55,9 @@ class RestAdapter:
         temp_headers = self.headers.copy()
         if beta:
             temp_headers["LD-API-Version"] = "beta"
-                
+
         retry = 0
+        got_response = False
         while retry < 5:
             try:
                 response = requests.request(
@@ -51,13 +65,20 @@ class RestAdapter:
                     url=url,
                     headers=temp_headers,
                     params=params,
-                    json=json if json else None
+                    json=json if json else None,
                 )
+                got_response = True
                 break
             except requests.exceptions.RequestException as e:
                 print("!!! Request failed. Retrying...")
+                print(f"    Error: {e}")
                 time.sleep(3)
             retry += 1
+
+        if not got_response:
+            print("!!! Request failed after 5 retries.")
+            print("    Exiting...")
+            exit(1)
 
         #########################
         # Rate limiting Logic
