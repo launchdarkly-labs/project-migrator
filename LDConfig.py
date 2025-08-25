@@ -107,6 +107,7 @@ class LDConfig:
             "target_api_token": target["TargetApiToken"],
             "target_is_federal": False,
             "ignore_pauses": False,
+            "verbose": False,
             "migrate_flag_templates": True,
             "migrate_context_kinds": True,
             "migrate_payload_filters": True,
@@ -131,6 +132,8 @@ class LDConfig:
             settings["target_is_federal"] = self.to_bool[target["TargetIsFederal"]]
         if "IgnorePauses" in options:
             settings["ignore_pauses"] = self.to_bool[options["IgnorePauses"]]
+        if "Verbose" in options:
+            settings["verbose"] = self.to_bool[options["Verbose"]]
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")

@@ -41,6 +41,11 @@ class LDMigrate:
     migrate_metrics = True
     ignore_pauses = False
 
+    def log_section_time(self, section_name, start_time):
+        """Helper method to log the time taken for a section"""
+        elapsed = time.time() - start_time
+        print(f"  ⏱️  [{section_name}] completed in {elapsed:.2f} seconds", end="\n\n")
+
     def __init__(
         self,
         api_key_src,
@@ -58,6 +63,7 @@ class LDMigrate:
         migrate_segments=True,
         migrate_metrics=True,
         ignore_pauses=False,
+        verbose=False,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -77,8 +83,8 @@ class LDMigrate:
         tgt_host = "app.launchdarkly.com"
         if target_is_federal:
             tgt_host = "app.launchdarkly.us"
-        self.http_source = RestAdapter(src_host, "v2", self.api_key_src)
-        self.http_target = RestAdapter(tgt_host, "v2", self.api_key_tgt)
+        self.http_source = RestAdapter(src_host, "v2", self.api_key_src, verbose)
+        self.http_target = RestAdapter(tgt_host, "v2", self.api_key_tgt, verbose)
         self.migrate_flag_templates = migrate_flag_templates
         self.migrate_context_kinds = migrate_context_kinds
         self.migrate_payload_filters = migrate_payload_filters
@@ -91,79 +97,97 @@ class LDMigrate:
         #############################
         # Setting up data structures
         #############################
+        section_start = time.time()
         print("Getting all flag keys...", end="", flush=True)
         self.flag_keys = self.get_source_flag_keys()
-        print("done. Got " + str(len(self.flag_keys)) + " flag keys.", end="\n\n")
+        print("done. Got " + str(len(self.flag_keys)) + " flag keys.")
+        self.log_section_time("Getting all flag keys", section_start)
 
+        section_start = time.time()
         print("Getting all environment keys...", end="", flush=True)
         self.env_keys = self.get_source_environment_keys()
-        print("done. Got " + str(len(self.env_keys)) + " environment keys.", end="\n\n")
+        print("done. Got " + str(len(self.env_keys)) + " environment keys.")
+        self.log_section_time("Getting all environment keys", section_start)
 
+        section_start = time.time()
         print("Getting source members...", end="", flush=True)
         self.source_members = self.get_source_members()
-        print("done.", end="\n\n")
+        print("done.")
+        self.log_section_time("Getting source members", section_start)
 
+        section_start = time.time()
         print("Getting target members...", end="", flush=True)
         self.target_members = self.get_target_members()
-        print("done.", end="\n\n")
+        print("done.")
+        self.log_section_time("Getting target members", section_start)
 
         ##########################
         # Starting migration
         ##########################
+        section_start = time.time()
         print("Creating target project...", flush=True)
         self.create_target_project()
-        print("Done.", end="\n\n")
+        self.log_section_time("Creating target project", section_start)
 
         if self.migrate_flag_templates:
+            section_start = time.time()
             print("Updating flag templates...", flush=True)
             self.create_target_flag_templates()
-            print("Done.", end="\n\n")
+            self.log_section_time("Updating flag templates", section_start)
         else:
             print("Skipping flag templates migration per app.ini.", end="\n\n")
 
         if self.migrate_context_kinds:
+            section_start = time.time()
             print("Creating context kinds...", flush=True)
             self.create_target_context_kinds()
-            print("Done.", end="\n\n")
+            self.log_section_time("Creating context kinds", section_start)
         else:
             print("Skipping context kinds migration per app.ini.", end="\n\n")
 
         if self.migrate_payload_filters:
+            section_start = time.time()
             print("Creating payload filters...", flush=True)
             self.create_target_payload_filters()
-            print("Done.", end="\n\n")
+            self.log_section_time("Creating payload filters", section_start)
         else:
             print("Skipping payload filters migration per app.ini.", end="\n\n")
 
+        section_start = time.time()
         print("Creating environments...", flush=True)
         self.create_target_environments()
-        print("Done.", end="\n\n")
+        self.log_section_time("Creating environments", section_start)
 
         if self.migrate_metrics:
+            section_start = time.time()
             print("Creating metrics...", flush=True)
             self.create_target_metrics()
-            print("Done.", end="\n\n")
+            self.log_section_time("Creating metrics", section_start)
 
+            section_start = time.time()
             print("Creating metric groups...", flush=True)
             self.create_target_metric_groups()
-            print("Done.", end="\n\n")
+            self.log_section_time("Creating metric groups", section_start)
         else:
             print("Skipping metrics migration per app.ini.", end="\n\n")
 
         if self.migrate_segments:
+            section_start = time.time()
             print("Creating segments...", flush=True)
             self.create_target_segments()
-            print("Done.", end="\n\n")
+            self.log_section_time("Creating segments", section_start)
         else:
             print("Skipping segments migration per app.ini.", end="\n\n")
 
+        section_start = time.time()
         print("Creating flags...", flush=True)
         self.create_target_flags()
-        print("Done.", end="\n\n")
+        self.log_section_time("Creating flags", section_start)
 
+        section_start = time.time()
         print("Creating targeting rules...", flush=True)
         self.create_target_flag_environments()
-        print("Done.", end="\n\n")
+        self.log_section_time("Creating targeting rules", section_start)
 
         return {
             "total_context_kinds": self.total_context_kinds,

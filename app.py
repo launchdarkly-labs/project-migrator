@@ -1,5 +1,6 @@
 from __version__ import __version__
 import json
+import time
 import LDMigrate
 import LDConfig
 
@@ -22,8 +23,16 @@ ldmigrator = LDMigrate.LDMigrate(
     migrate_payload_filters=settings["migrate_payload_filters"],
     migrate_segments=settings["migrate_segments"],
     migrate_metrics=settings["migrate_metrics"],
+    verbose=settings["verbose"],
 )
+
+print("Starting migration...")
+start_time = time.time()
 
 result = ldmigrator.migrate()
 
+end_time = time.time()
+total_time = end_time - start_time
+
+print(f"Migration completed in {total_time:.2f} seconds")
 print(json.dumps(result))

@@ -8,10 +8,11 @@ class RestAdapter:
     url_int = ""
     api_token = ""
 
-    def __init__(self, hostname, version, api_token):
+    def __init__(self, hostname, version, api_token, verbose=False):
         self.url = f"https://{hostname}/api/{version}"
         self.url_int = f"https://{hostname}/internal"
         self.api_token = api_token
+        self.verbose = verbose
         self.headers = {
             "Authorization": f"{self.api_token}",
             "Content-Type": "application/json",
@@ -55,6 +56,17 @@ class RestAdapter:
         temp_headers = self.headers.copy()
         if beta:
             temp_headers["LD-API-Version"] = "beta"
+
+        # Verbose logging
+        if self.verbose:
+            print("\n")
+            print(f"🔍 [HTTP REQUEST] {http_method} {url}")
+            if params:
+                print(f"    📝 Params: {params}")
+            if json:
+                print(f"    📤 JSON Body: {json}")
+            if internal:
+                print(f"    🏠 Internal API: True")
 
         retry = 0
         got_response = False
@@ -108,6 +120,7 @@ class RestAdapter:
                     + " seconds. Remaining tries: "
                     + str(tries)
                 )
+                print(f"     URL: {url}")
                 time.sleep(delay)
                 if tries == 0:
                     return "Rate limit exceeded. Please try again later."
