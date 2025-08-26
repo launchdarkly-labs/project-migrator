@@ -58,7 +58,7 @@ class LDMigrate:
         migrate_segments=True,
         migrate_metrics=True,
         ignore_pauses=False,
-        target_view=None,
+        target_views=None,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -86,7 +86,7 @@ class LDMigrate:
         self.migrate_segments = migrate_segments
         self.migrate_metrics = migrate_metrics
         self.ignore_pauses = ignore_pauses
-        self.target_view = target_view
+        self.target_views = target_views
 
     def migrate(self):
         # self.get_source_release_pipelines()
@@ -1166,8 +1166,8 @@ class LDMigrate:
                     payload["maintainerId"] = self.target_members[
                         flag["_maintainer"]["email"]
                     ]
-            if self.target_view:
-                payload["viewKeys"] = [self.target_view]
+            if self.target_views:
+                payload["viewKeys"] = [self.target_views]
 
             response = self.http_target.post(
                 "/flags/" + self.project_key_target,

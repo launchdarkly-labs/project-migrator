@@ -115,8 +115,8 @@ class LDConfig:
         }
         if "TargetProjectKey" in target:
             settings["target_project_key"] = target["TargetProjectKey"]
-        if "TargetView" in target:
-            settings["target_view"] = target["TargetView"]
+        if "TargetViews" in target:
+            settings["target_views"] = target["TargetViews"]
         if "MigrateFlagTemplates" in options:
             settings["migrate_flag_templates"] = self.to_bool[options["MigrateFlagTemplates"]]
         if "MigrateContextKinds" in options:
