@@ -26,6 +26,7 @@ SourceProjectKey=support-service
 TargetApiToken=api-1234567890abcdef
 # TargetProjectKey=fun-little-project
 # TargetIsFederal=false
+# TargetViews=view1,view2
 
 [Options]
 MigrateFlagTemplates=true
