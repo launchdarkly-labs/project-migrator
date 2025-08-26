@@ -15,7 +15,7 @@ class RestAdapter:
             "Authorization": f"{self.api_token}",
             "Content-Type": "application/json"
         }
-    
+
     def get(self, path, params=None, json=None, beta=False, internal=False):
         return self.request("GET", path, params=params, json=json, beta=beta, internal=internal)
 
@@ -42,7 +42,7 @@ class RestAdapter:
         temp_headers = self.headers.copy()
         if beta:
             temp_headers["LD-API-Version"] = "beta"
-                
+
         retry = 0
         while retry < 5:
             try:
