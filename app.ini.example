@@ -16,6 +16,7 @@ MigrateSegments=true
 MigrateMetrics=true
 # IgnorePauses=false
 # Verbose=false
+# AllowTargetProjectAlreadyExist=false
 # FlagsToIgnore=flag1,flag2,flag3
 # FlagsToMigrate=flag1,flag2,flag3
 # MigrationMode=MigrateOnly|MigrateRetry|Merge

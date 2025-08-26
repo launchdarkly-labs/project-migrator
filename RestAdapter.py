@@ -127,4 +127,8 @@ class RestAdapter:
             else:
                 tries = 5
 
+        # Verbose logging for response
+        if self.verbose:
+            print(f"    📨 Response: {response.status_code}")
+
         return response

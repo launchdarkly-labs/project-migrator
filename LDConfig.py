@@ -108,6 +108,7 @@ class LDConfig:
             "target_is_federal": False,
             "ignore_pauses": False,
             "verbose": False,
+            "allow_target_project_already_exist": False,
             "migrate_flag_templates": True,
             "migrate_context_kinds": True,
             "migrate_payload_filters": True,
@@ -134,6 +135,8 @@ class LDConfig:
             settings["ignore_pauses"] = self.to_bool[options["IgnorePauses"]]
         if "Verbose" in options:
             settings["verbose"] = self.to_bool[options["Verbose"]]
+        if "AllowTargetProjectAlreadyExist" in options:
+            settings["allow_target_project_already_exist"] = self.to_bool[options["AllowTargetProjectAlreadyExist"]]
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")

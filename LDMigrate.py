@@ -64,6 +64,7 @@ class LDMigrate:
         migrate_metrics=True,
         ignore_pauses=False,
         verbose=False,
+        allow_target_project_already_exist=False,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -91,6 +92,7 @@ class LDMigrate:
         self.migrate_segments = migrate_segments
         self.migrate_metrics = migrate_metrics
         self.ignore_pauses = ignore_pauses
+        self.allow_target_project_already_exist = allow_target_project_already_exist
 
     def migrate(self):
         # self.get_source_release_pipelines()
@@ -224,6 +226,12 @@ class LDMigrate:
     def get_source_project(self):
         path = "/projects/" + self.project_key_source
         response = self.http_source.get(path)
+        data = json.loads(response.text)
+        return data
+
+    def get_target_project(self):
+        path = "/projects/" + self.project_key_target
+        response = self.http_target.get(path)
         data = json.loads(response.text)
         return data
 
@@ -631,6 +639,18 @@ class LDMigrate:
     ##################################################
 
     def create_target_project(self):
+
+        target_project = self.get_target_project();
+        if target_project:
+            if not self.allow_target_project_already_exist:
+                print("❌ Target project already exists.")
+                print("   Set allowTargetProjectAlreadyExist to true to continue.")
+                exit(1)
+            else:
+                print("...Target project already exists. Continuing due to allowTargetProjectAlreadyExist=true.")
+                return target_project;
+            
+
         project = self.get_source_project()
         project_name = project["name"]
         if self.api_key_tgt == self.api_key_src:
