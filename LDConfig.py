@@ -109,6 +109,7 @@ class LDConfig:
             "ignore_pauses": False,
             "verbose": False,
             "allow_target_project_already_exist": False,
+            "environment_mapping": {},
             "migrate_flag_templates": True,
             "migrate_context_kinds": True,
             "migrate_payload_filters": True,
@@ -137,6 +138,16 @@ class LDConfig:
             settings["verbose"] = self.to_bool[options["Verbose"]]
         if "AllowTargetProjectAlreadyExist" in options:
             settings["allow_target_project_already_exist"] = self.to_bool[options["AllowTargetProjectAlreadyExist"]]
+        if "EnvironmentMapping" in options:
+            env_mapping = {}
+            if options["EnvironmentMapping"].strip():
+                # Parse format: "source1:target1,source2:target2"
+                pairs = options["EnvironmentMapping"].split(",")
+                for pair in pairs:
+                    if ":" in pair:
+                        source_env, target_env = pair.split(":", 1)
+                        env_mapping[source_env.strip()] = target_env.strip()
+            settings["environment_mapping"] = env_mapping
         if "FlagsToIgnore" in options:
             if options["FlagsToIgnore"] != "":
                 settings["flags_to_ignore"] = options["FlagsToIgnore"].split(",")

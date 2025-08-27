@@ -17,6 +17,7 @@ MigrateMetrics=true
 # IgnorePauses=false
 # Verbose=false
 # AllowTargetProjectAlreadyExist=false
+# EnvironmentMapping=production:production,dev:dev,demo:staging
 # FlagsToIgnore=flag1,flag2,flag3
 # FlagsToMigrate=flag1,flag2,flag3
 # MigrationMode=MigrateOnly|MigrateRetry|Merge

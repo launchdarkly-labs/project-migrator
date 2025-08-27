@@ -46,6 +46,10 @@ class LDMigrate:
         elapsed = time.time() - start_time
         print(f"  ⏱️  [{section_name}] completed in {elapsed:.2f} seconds", end="\n\n")
 
+    def map_environment_key(self, source_env_key):
+        """Helper method to map source environment key to target environment key"""
+        return self.environment_mapping.get(source_env_key, source_env_key)
+
     def __init__(
         self,
         api_key_src,
@@ -65,6 +69,7 @@ class LDMigrate:
         ignore_pauses=False,
         verbose=False,
         allow_target_project_already_exist=False,
+        environment_mapping=None,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -93,6 +98,7 @@ class LDMigrate:
         self.migrate_metrics = migrate_metrics
         self.ignore_pauses = ignore_pauses
         self.allow_target_project_already_exist = allow_target_project_already_exist
+        self.environment_mapping = environment_mapping or {}
 
     def migrate(self):
         # self.get_source_release_pipelines()
@@ -232,8 +238,7 @@ class LDMigrate:
     def get_target_project(self):
         path = "/projects/" + self.project_key_target
         response = self.http_target.get(path)
-        data = json.loads(response.text)
-        return data
+        return response
 
     ##################################################
     # Get source flag templates
@@ -641,13 +646,14 @@ class LDMigrate:
     def create_target_project(self):
 
         target_project = self.get_target_project();
-        if target_project:
+        if target_project is not None and target_project.status_code == 200:
             if not self.allow_target_project_already_exist:
-                print("❌ Target project already exists.")
+                print("❌   Target project already exists.")
                 print("   Set allowTargetProjectAlreadyExist to true to continue.")
                 exit(1)
             else:
-                print("...Target project already exists. Continuing due to allowTargetProjectAlreadyExist=true.")
+                data = json.loads(target_project.text)
+                print(f"⚠️   Target project {data['name']} already exists. Continuing due to allowTargetProjectAlreadyExist=true.")
                 return target_project;
             
 
@@ -743,6 +749,9 @@ class LDMigrate:
                 beta=True,
                 internal=True,
             )
+            if response.status_code != 200:
+                print(f"❌ Error updating flag template: {template["name"]} {response.text}")
+                exit(1)
         print("...updated flag templates")
         return
 
@@ -770,6 +779,9 @@ class LDMigrate:
                 + kind["key"],
                 json=payload,
             )
+            if response.status_code != 200:
+                print(f"❌ Error creating context kind: {kind["name"]} {response.text}")
+                exit(1)
             num_ctx += 1
 
         exp_settings = self.get_source_experiment_settings()
@@ -824,8 +836,21 @@ class LDMigrate:
         total_envs = len(environments)
 
         for env in environments:
+            # Apply environment mapping
+            target_env_key = self.map_environment_key(env["key"])
+            
+            # Skip environments based on mapping rules
+            if self.environment_mapping:
+                if env["key"] not in self.environment_mapping:
+                    print(f"⏩  Skipped environment: '{env['name']}' (key: {env['key']}) - not in environment mapping")
+                    continue
+                elif self.environment_mapping[env["key"]] != env["key"] and self.environment_mapping[env["key"]] in existing_keys:
+                    print(f"⏭️   Skipped because the source {env['key']} env name is different than the destination {self.environment_mapping[env['key']]} env name and that environment already exists in the target project")
+                    continue
+                
             num += 1
-            if env["key"] in existing_keys:
+                
+            if target_env_key in existing_keys:
                 payload = [
                     {"op": "replace", "path": "/name", "value": env["name"]},
                     {"op": "replace", "path": "/color", "value": env["color"]},
@@ -862,13 +887,13 @@ class LDMigrate:
                     "/projects/"
                     + self.project_key_target
                     + "/environments/"
-                    + env["key"],
+                    + target_env_key,
                     json=payload,
                 )
             else:
                 payload = {
                     "name": env["name"],
-                    "key": env["key"],
+                    "key": target_env_key,
                     "color": env["color"],
                     "defaultTtl": env["defaultTtl"],
                     "tags": env["tags"],
@@ -965,13 +990,19 @@ class LDMigrate:
                     "/projects/"
                     + self.project_key_target
                     + "/environments/"
-                    + env["key"],
+                    + target_env_key,
                     json=approvals,
                 )
                 if response.status_code != 200:
                     if not self.ignore_pauses:
                         time.sleep(0.5)
                 status_code = response.status_code
+
+            # Print environment creation/update status
+            if target_env_key in existing_keys:
+                print(f"   Patched environment: '{env['name']}' (source key: {env['key']} -> target key: {target_env_key})")
+            else:
+                print(f"   Created environment: '{env['name']}' (key: {target_env_key})")
 
             if num % 10 == 0:
                 if not self.ignore_pauses:
@@ -1057,6 +1088,8 @@ class LDMigrate:
         segments = self.get_source_segments()
         total_segments = 0
         for env in segments:
+            # Apply environment mapping for segments
+            target_env_key = self.map_environment_key(env["environment"])
             add_last = []
             for segment in env["segments"]:
                 response = self.http_source.get(
@@ -1075,7 +1108,7 @@ class LDMigrate:
                     "unbounded": False,
                 }
                 response = self.http_target.post(
-                    "/segments/" + self.project_key_target + "/" + env["environment"],
+                    "/segments/" + self.project_key_target + "/" + target_env_key,
                     json=payload,
                 )
                 payload = []
@@ -1130,7 +1163,7 @@ class LDMigrate:
                 if for_later:
                     add_last.append(
                         {
-                            "path": env["environment"] + "/" + segment["key"],
+                            "path": target_env_key + "/" + segment["key"],
                             "payload": {
                                 "op": "replace",
                                 "path": "/rules",
@@ -1150,7 +1183,7 @@ class LDMigrate:
                     "/segments/"
                     + self.project_key_target
                     + "/"
-                    + env["environment"]
+                    + target_env_key
                     + "/"
                     + segment["key"],
                     json=payload,
@@ -1158,7 +1191,7 @@ class LDMigrate:
                 if response.status_code != 200:
                     print(
                         "...error updating segment: "
-                        + env["environment"]
+                        + target_env_key
                         + "/"
                         + segment["key"]
                     )
@@ -1318,39 +1351,41 @@ class LDMigrate:
             flag_details = self.get_source_flag_details(flag)
             payload = []
             for env in self.env_keys:
+                # Apply environment mapping for flag environments
+                target_env_key = self.map_environment_key(env)
                 env_details = flag_details["environments"][env]
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/on",
+                        "path": "/environments/" + target_env_key + "/on",
                         "value": env_details["on"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/archived",
+                        "path": "/environments/" + target_env_key + "/archived",
                         "value": env_details["archived"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/targets",
+                        "path": "/environments/" + target_env_key + "/targets",
                         "value": env_details["targets"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/contextTargets",
+                        "path": "/environments/" + target_env_key + "/contextTargets",
                         "value": env_details["contextTargets"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/fallthrough",
+                        "path": "/environments/" + target_env_key + "/fallthrough",
                         "value": env_details["fallthrough"],
                     }
                 )
@@ -1358,28 +1393,28 @@ class LDMigrate:
                     payload.append(
                         {
                             "op": "replace",
-                            "path": "/environments/" + env + "/offVariation",
+                            "path": "/environments/" + target_env_key + "/offVariation",
                             "value": env_details["offVariation"],
                         }
                     )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/prerequisites",
+                        "path": "/environments/" + target_env_key + "/prerequisites",
                         "value": env_details["prerequisites"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/trackEvents",
+                        "path": "/environments/" + target_env_key + "/trackEvents",
                         "value": env_details["trackEvents"],
                     }
                 )
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/trackEventsFallthrough",
+                        "path": "/environments/" + target_env_key + "/trackEventsFallthrough",
                         "value": env_details["trackEventsFallthrough"],
                     }
                 )
@@ -1404,7 +1439,7 @@ class LDMigrate:
                 payload.append(
                     {
                         "op": "replace",
-                        "path": "/environments/" + env + "/rules",
+                        "path": "/environments/" + target_env_key + "/rules",
                         "value": env_details["rules"],
                     }
                 )
@@ -1415,8 +1450,8 @@ class LDMigrate:
             if response.status_code != 200:
                 error_flags.append(flag)
                 print(json.dumps(payload))
+                print("...error updating flag " + flag)
                 exit(1)
-                print("...error updating flag " + flag + ". Will retry later.")
             else:
                 print(
                     "...updated environments for flag " + flag + " (" + str(num) + ")"

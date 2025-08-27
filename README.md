@@ -34,10 +34,32 @@ MigratePayloadFilters=true
 MigrateSegments=true
 MigrateMetrics=true
 # IgnorePauses=false
+# Verbose=false
+# AllowTargetProjectAlreadyExist=false
+# EnvironmentMapping=production:production,dev:dev,qa:staging
 # FlagsToIgnore=flag1,flag2,flag3
 # FlagsToMigrate=flag1,flag2,flag3
 # MigrationMode=MigrateOnly|MigrateRetry|Merge
 ```
+
+## Configuration Options
+
+### [Options] Section
+
+- **`MigrateFlagTemplates`** (true/false): Include flag templates in migration
+- **`MigrateContextKinds`** (true/false): Include context kinds in migratio
+- **`MigratePayloadFilters`** (true/false): Include payload filters in migration
+- **`MigrateSegments`** (true/false): Include segments in migration
+- **`MigrateMetrics`** (true/false): Include metrics and metric groups in migration
+- **`IgnorePauses`** (true/false): Skip rate limiting delays (use with caution)
+- **`Verbose`** (true/false): Enable detailed HTTP request logging for debugging
+- **`AllowTargetProjectAlreadyExist`** (true/false): Continue migration if target project already exists
+- **`EnvironmentMapping`** (source:target pairs): Map source environment names to different target names
+  - Example: `production:production,dev:development,staging:test`
+  - Only environments listed in mapping will be migrated when this option is used
+- **`FlagsToIgnore`** (comma-separated): Specific flag keys to skip during migration
+- **`FlagsToMigrate`** (comma-separated): Only migrate these specific flag keys (cannot be used with FlagsToIgnore)
+- **`MigrationMode`** (MigrateOnly|MigrateRetry|Merge): How to handle existing target projects
 
 ## What it migrates:
 * Project settings
@@ -57,6 +79,9 @@ MigrateMetrics=true
 * Duplicate a project in the same instance
 * Select specific flags to copy
 * Select specific flags to ignore
+* Environment mapping to rename environments during migration
+* Verbose logging for debugging API interactions
+* Built-in rate limit handling and timing information
 
 ## What it doesn't migrate:
 * AI Configs
@@ -76,6 +101,8 @@ MigrateMetrics=true
 * Flag statuses will all be reset
 * All creation dates will be set at the time of running this script
 * Historical data (i.e. Audit log) cannot be transferred
+* When using EnvironmentMapping, only environments with a mapping (e.g., `dev:development`) will be migrated
+* Environment mapping will skip environments where source and target names differ if the named target environment already exists
 
 ## Future considerations:
 * AI Configs

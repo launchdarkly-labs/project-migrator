@@ -25,6 +25,7 @@ ldmigrator = LDMigrate.LDMigrate(
     migrate_metrics=settings["migrate_metrics"],
     verbose=settings["verbose"],
     allow_target_project_already_exist=settings["allow_target_project_already_exist"],
+    environment_mapping=settings["environment_mapping"],
 )
 
 print("Starting migration...")
