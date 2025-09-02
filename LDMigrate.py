@@ -835,6 +835,11 @@ class LDMigrate:
         existing_keys = self.get_target_environment_keys()
         total_envs = len(environments)
 
+        # Display source and target environment keys
+        source_env_keys = [env["key"] for env in environments]
+        print(f"--> Source envs are {source_env_keys}")
+        print(f"--> Target keys are {existing_keys}")
+
         for env in environments:
             # Apply environment mapping
             target_env_key = self.map_environment_key(env["key"])
@@ -1189,12 +1194,9 @@ class LDMigrate:
                     json=payload,
                 )
                 if response.status_code != 200:
-                    print(
-                        "...error updating segment: "
-                        + target_env_key
-                        + "/"
-                        + segment["key"]
-                    )
+                    print(f"❌ Error patching segment: {target_env_key}/{segment['key']}")
+                    print(f"   Status Code: {response.status_code} Response: {response.text}")
+                    print(f"   Payload: {payload}")
 
                 total_segments += 1
 
@@ -1450,7 +1452,7 @@ class LDMigrate:
             if response.status_code != 200:
                 error_flags.append(flag)
                 print(json.dumps(payload))
-                print("...error updating flag " + flag)
+                print("...error ({response.status_code}) updating flag " + flag)
                 exit(1)
             else:
                 print(

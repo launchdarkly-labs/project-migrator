@@ -127,8 +127,12 @@ class RestAdapter:
             else:
                 tries = 5
 
+        if response.status_code > 399:
+            print(f"   Status Code: {response.status_code} Response: {response.text}")
+            print(f"   Payload: {json}")
         # Verbose logging for response
-        if self.verbose:
+        elif self.verbose:
             print(f"    📨 Response: {response.status_code}")
+        
 
         return response
