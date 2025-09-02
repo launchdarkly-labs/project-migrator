@@ -852,6 +852,7 @@ class LDMigrate:
                 elif self.environment_mapping[env["key"]] != env["key"] and self.environment_mapping[env["key"]] in existing_keys:
                     print(f"⏭️   Skipped because the source {env['key']} env name is different than the destination {self.environment_mapping[env['key']]} env name and that environment already exists in the target project")
                     continue
+                print(f"▶️  Mapped source {env['key']} to {self.environment_mapping[env['key']]}")
                 
             num += 1
                 
@@ -1094,7 +1095,12 @@ class LDMigrate:
         total_segments = 0
         for env in segments:
             # Apply environment mapping for segments
+            if self.environment_mapping:
+                if env["environment"] not in self.environment_mapping:
+                    print(f"⏩  Skipped segments in environment '{env['environment']}' - not in environment mapping")
+                    continue
             target_env_key = self.map_environment_key(env["environment"])
+
             add_last = []
             for segment in env["segments"]:
                 response = self.http_source.get(
@@ -1354,7 +1360,12 @@ class LDMigrate:
             payload = []
             for env in self.env_keys:
                 # Apply environment mapping for flag environments
+                if self.environment_mapping:
+                    if env not in self.environment_mapping:
+                        print(f"⏩  Skipped flag environment '{env}' - not in environment mapping")
+                        continue
                 target_env_key = self.map_environment_key(env)
+
                 env_details = flag_details["environments"][env]
                 payload.append(
                     {
@@ -1452,7 +1463,7 @@ class LDMigrate:
             if response.status_code != 200:
                 error_flags.append(flag)
                 print(json.dumps(payload))
-                print("...error ({response.status_code}) updating flag " + flag)
+                print(f"...error ({response.status_code}) updating flag {flag}")
                 exit(1)
             else:
                 print(
