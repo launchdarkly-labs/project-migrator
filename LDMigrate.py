@@ -1118,6 +1118,12 @@ class LDMigrate:
                     "tags": segment_data["tags"],
                     "unbounded": False,
                 }
+
+                response = self.http_target.get("/segments/" + self.project_key_target + "/" + target_env_key)
+                if response.status_code == 200:
+                    print(f"⏩  Skipped segment {segment['key']} in environment {target_env_key} - already exists")
+                    continue
+
                 response = self.http_target.post(
                     "/segments/" + self.project_key_target + "/" + target_env_key,
                     json=payload,
@@ -1253,6 +1259,13 @@ class LDMigrate:
                         flag["_maintainer"]["email"]
                     ]
 
+            response = self.http_target.get(
+                "/flags/" + self.project_key_target
+            )
+            if response.status_code == 200:
+                    print(f"⏩  Skipped flag creation for {self.project_key_target} - already exists")
+                    continue
+
             response = self.http_target.post(
                 "/flags/" + self.project_key_target,
                 json=payload,
@@ -1362,7 +1375,7 @@ class LDMigrate:
                 # Apply environment mapping for flag environments
                 if self.environment_mapping:
                     if env not in self.environment_mapping:
-                        print(f"⏩  Skipped flag environment '{env}' - not in environment mapping")
+                        print(f"⏩  Skipped flag environment '{env}' - for flag {flag_details['name']} - not in environment mapping")
                         continue
                 target_env_key = self.map_environment_key(env)
 
