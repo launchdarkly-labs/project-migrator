@@ -80,3 +80,9 @@
 
 - Check to see if `links` item exists in the payload filters payload.
 
+## [1.5.0] - 2025-12-23
+
+### Added
+
+- Added `IgnoreDuplicateFlagNames` and `IgnoreDuplicateSegmentNames` in `app.ini`.
+

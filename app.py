@@ -22,6 +22,8 @@ ldmigrator = LDMigrate.LDMigrate(
     migrate_payload_filters=settings["migrate_payload_filters"],
     migrate_segments=settings["migrate_segments"],
     migrate_metrics=settings["migrate_metrics"],
+    ignore_duplicate_flags=settings["ignore_duplicate_flags"],
+    ignore_duplicate_segments=settings["ignore_duplicate_segments"],
 )
 
 result = ldmigrator.migrate()

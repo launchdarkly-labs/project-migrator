@@ -21,7 +21,11 @@ class LDMigrate:
     flags_to_migrate = []
     migration_mode = None
     flag_keys = []
+    target_flag_keys = []
+    segment_keys = []
+    target_segment_keys = []
     env_keys = []
+    target_env_keys = []
     source_members = {}
     target_members = {}
     total_context_kinds = 0
@@ -40,6 +44,8 @@ class LDMigrate:
     migrate_segments = True
     migrate_metrics = True
     ignore_pauses = False
+    ignore_duplicate_flags = False
+    ignore_duplicate_segments = False
 
     def __init__(
         self,
@@ -58,6 +64,8 @@ class LDMigrate:
         migrate_segments=True,
         migrate_metrics=True,
         ignore_pauses=False,
+        ignore_duplicate_flags=False,
+        ignore_duplicate_segments=False,
     ):
         self.api_key_src = api_key_src
         self.api_key_tgt = api_key_tgt
@@ -85,17 +93,27 @@ class LDMigrate:
         self.migrate_segments = migrate_segments
         self.migrate_metrics = migrate_metrics
         self.ignore_pauses = ignore_pauses
+        self.ignore_duplicate_flags = ignore_duplicate_flags
+        self.ignore_duplicate_segments = ignore_duplicate_segments
 
     def migrate(self):
+        dup_flags = []
+        dup_segs = []
+        ask_continue = False
+
+        if self.migration_mode == MigrationMode.MERGE and not self.target_project_exists():
+            print("Target project does not exist. Try migration instead.")
+            exit(1)
+        
         # self.get_source_release_pipelines()
         #############################
         # Setting up data structures
         #############################
-        print("Getting all flag keys...", end="", flush=True)
+        print("Getting source flag keys...", end="", flush=True)
         self.flag_keys = self.get_source_flag_keys()
         print("done. Got " + str(len(self.flag_keys)) + " flag keys.", end="\n\n")
 
-        print("Getting all environment keys...", end="", flush=True)
+        print("Getting source environment keys...", end="", flush=True)
         self.env_keys = self.get_source_environment_keys()
         print("done. Got " + str(len(self.env_keys)) + " environment keys.", end="\n\n")
 
@@ -106,6 +124,57 @@ class LDMigrate:
         print("Getting target members...", end="", flush=True)
         self.target_members = self.get_target_members()
         print("done.", end="\n\n")
+
+        if self.migration_mode == MigrationMode.MERGE:
+            if not self.ignore_duplicate_flags:
+                ask_continue = True
+                print("Getting target flag keys...", end="", flush=True)
+                self.target_flag_keys = self.get_target_flag_keys()
+                print("done. Got " + str(len(self.target_flag_keys)) + " flag keys.", end="\n\n")
+                dup_flags = set(self.flag_keys).intersection(self.target_flag_keys)
+                if len(dup_flags) > 0:
+                    print(
+                        "Warning: Found "
+                        + str(len(dup_flags))
+                        + " duplicate flags in target project."
+                    )
+                    for df in dup_flags:
+                        print("  - " + df)
+                    print("")
+
+            if not self.ignore_duplicate_segments:
+                ask_continue = True
+                print("Getting target environment keys...", end="", flush=True)
+                self.target_env_keys = self.get_target_environment_keys()
+                print("done. Got " + str(len(self.env_keys)) + " environment keys.", end="\n\n")
+
+                print("Getting source segment keys...", end="", flush=True)
+                self.segment_keys = self.get_source_segment_keys()
+                print("done. Got " + str(len(self.segment_keys)) + " segment keys.", end="\n\n")
+
+                print("Getting target segment keys...", end="", flush=True)
+                self.target_segment_keys = self.get_target_segment_keys()
+                print("done. Got " + str(len(self.target_segment_keys)) + " segment keys.", end="\n\n")
+
+                dup_segs = set(self.segment_keys).intersection(self.target_segment_keys)
+                if len(dup_segs) > 0:
+                    print(
+                        "Warning: Found "
+                        + str(len(dup_segs))
+                        + " duplicate segments in target project."
+                    )
+                    for ds in dup_segs:
+                        print("  - " + ds)
+                    print("")
+            
+            if ask_continue:
+                if len(dup_flags) == 0 and len(dup_segs) == 0:
+                    print("No duplicate flags or segments found.\n\n")
+
+                user_input = input("Do you want to continue? (y/n): ")
+                if user_input.lower() != "y":
+                    print("Exiting migration.")
+                    exit(0)
 
         ##########################
         # Starting migration
@@ -423,6 +492,31 @@ class LDMigrate:
         return metric_groups
 
     ##################################################
+    # Get source segment keys
+    ##################################################
+
+    def get_source_segment_keys(self):
+        pagination = 50
+        source_segment_keys = []
+        num = 0
+        for env in self.env_keys:
+            path = "/segments/" + self.project_key_source + "/" + env + "?limit=" + str(pagination)
+            keep_going = True
+            while keep_going:
+                response = self.http_source.get(path)
+                data = json.loads(response.text)
+
+                for item in data["items"]:
+                    source_segment_keys.append(env + "|" +item["key"])
+                if "next" not in data["_links"]:
+                    keep_going = False
+                else:
+                    path = data["_links"]["next"]["href"].replace("/api/v2", "")
+                    num += pagination
+
+        return source_segment_keys
+
+    ##################################################
     # Get source segments
     ##################################################
 
@@ -555,7 +649,7 @@ class LDMigrate:
             "/projects/" + self.project_key_source + "/release-pipelines", beta=True
         )
         data = json.loads(response.text)
-        print(json.dumps(data))
+        # print(json.dumps(data))
         exit(1)
 
         return data
@@ -643,6 +737,57 @@ class LDMigrate:
         else:
             print("...created target project")
         return data
+
+    ##################################################
+    # Get target flag keys
+    ##################################################
+
+    def get_target_flag_keys(self):
+        pagination = 50
+        target_flag_keys = []
+        num = 0
+        path = "/flags/" + self.project_key_target + "?limit=" + str(pagination)
+        keep_going = True
+        while keep_going:
+            response = self.http_target.get(path)
+            data = json.loads(response.text)
+
+            for item in data["items"]:
+                target_flag_keys.append(item["key"])
+
+            if "next" not in data["_links"]:
+                keep_going = False
+            else:
+                path = data["_links"]["next"]["href"].replace("/api/v2", "")
+                num += pagination
+
+        return target_flag_keys
+
+    ##################################################
+    # Get target segment keys
+    ##################################################
+
+    def get_target_segment_keys(self):
+        pagination = 50
+        target_segment_keys = []
+        num = 0
+        for env in self.target_env_keys:
+            path = "/segments/" + self.project_key_target + "/" + env + "?limit=" + str(pagination)
+            keep_going = True
+            while keep_going:
+                response = self.http_target.get(path)
+                data = json.loads(response.text)
+
+                for item in data["items"]:
+                    target_segment_keys.append(env + "|" +item["key"])
+
+                if "next" not in data["_links"]:
+                    keep_going = False
+                else:
+                    path = data["_links"]["next"]["href"].replace("/api/v2", "")
+                    num += pagination
+
+        return target_segment_keys
 
     ##################################################
     # Create target flag templates
@@ -1371,8 +1516,8 @@ class LDMigrate:
             if response.status_code != 200:
                 error_flags.append(flag)
                 print(json.dumps(payload))
-                exit(1)
                 print("...error updating flag " + flag + ". Will retry later.")
+                exit(1)
             else:
                 print(
                     "...updated environments for flag " + flag + " (" + str(num) + ")"

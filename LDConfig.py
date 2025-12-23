@@ -112,6 +112,8 @@ class LDConfig:
             "migrate_payload_filters": True,
             "migrate_segments": True,
             "migrate_metrics": True,
+            "ignore_duplicate_flags": False,
+            "ignore_duplicate_segments": False,
         }
         if "TargetProjectKey" in target:
             settings["target_project_key"] = target["TargetProjectKey"]
@@ -125,6 +127,10 @@ class LDConfig:
             settings["migrate_segments"] = self.to_bool[options["MigrateSegments"]]
         if "MigrateMetrics" in options:
             settings["migrate_metrics"] = self.to_bool[options["MigrateMetrics"]]
+        if "IgnoreDuplicateFlagNames" in options:
+            settings["ignore_duplicate_flags"] = self.to_bool[options["IgnoreDuplicateFlagNames"]]
+        if "IgnoreDuplicateSegmentNames" in options:
+            settings["ignore_duplicate_segments"] = self.to_bool[options["IgnoreDuplicateSegmentNames"]]
         if "SourceIsFederal" in source:
             settings["source_is_federal"] = self.to_bool[source["SourceIsFederal"]]
         if "TargetIsFederal" in target:
