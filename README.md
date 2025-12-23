@@ -33,6 +33,9 @@ MigrateContextKinds=true
 MigratePayloadFilters=true
 MigrateSegments=true
 MigrateMetrics=true
+# The following 2 options are only available for Merge
+IgnoreDuplicateFlagNames=false
+IgnoreDuplicateSegmentNames=false
 # IgnorePauses=false
 # FlagsToIgnore=flag1,flag2,flag3
 # FlagsToMigrate=flag1,flag2,flag3
